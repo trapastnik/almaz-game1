@@ -1,0 +1,13 @@
+.git
+.github
+.next
+.npm-cache
+.vinext
+.wrangler
+dist
+node_modules
+outputs
+work
+.DS_Store
+.env*
+npm-debug.log*
