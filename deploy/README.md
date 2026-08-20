@@ -21,6 +21,10 @@ server block from `deploy/nginx-site.conf.example` to
 `/srv/infrastructure/proxy.conf`. Validate nginx before restarting only the
 shared proxy.
 
+Until a domain is ready, `deploy/nginx-ip.conf.example` documents the temporary
+HTTP route for `188.225.35.200`. It still reaches the app only through the
+shared `proxy` network and does not publish port 3000.
+
 ## GitHub Actions secrets
 
 Create the `production` environment and add these repository secrets:
