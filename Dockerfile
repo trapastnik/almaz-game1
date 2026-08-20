@@ -17,6 +17,9 @@ ENV NODE_ENV=production \
 WORKDIR /app
 
 COPY --from=builder --chown=node:node /app/dist/standalone ./
+COPY --from=builder --chown=node:node /app/node_modules/react ./node_modules/react
+COPY --from=builder --chown=node:node /app/node_modules/react-dom ./node_modules/react-dom
+COPY --from=builder --chown=node:node /app/node_modules/scheduler ./node_modules/scheduler
 
 USER node
 
