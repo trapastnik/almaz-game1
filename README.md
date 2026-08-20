@@ -43,7 +43,8 @@ npm test
 
 ## Развёртывание на VPS
 
-Проект включает Docker Compose, Caddy с автоматическим HTTPS и готовый шаблон
-GitHub Actions. После первичной настройки VPS workflow активируется, и каждый
-push в ветку `main` автоматически обновляет приложение. Пошаговая инструкция
-находится в [`deploy/README.md`](deploy/README.md).
+Проект включает Docker Compose для существующей сети `proxy`, шаблон server
+block общего nginx и готовый шаблон GitHub Actions. После первичной настройки
+VPS workflow активируется, и каждый push в ветку `main` автоматически обновляет
+приложение. Пошаговая инструкция находится в
+[`deploy/README.md`](deploy/README.md).

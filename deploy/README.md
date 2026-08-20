@@ -3,22 +3,23 @@
 The workflow template is stored in `deploy/github-actions-deploy.yml`. Once the
 VPS and GitHub secrets are ready, place it at `.github/workflows/deploy.yml` to
 activate automatic deployment. It tests `main`, copies the release to
-`/opt/touch-game`, and runs Docker Compose. Caddy exposes the app and obtains a
-TLS certificate automatically when `SITE_ADDRESS` is a domain.
+`/srv/projects/almaz-game1`, and runs Docker Compose. The app joins the existing
+external Docker network `proxy`; the shared nginx is the only public entry.
 
 ## One-time VPS setup
 
-The VPS needs Docker Engine with the Compose plugin, ports 80 and 443 open, and
-a non-root deploy user that can run Docker.
+The VPS needs Docker Engine with the Compose plugin, the external Docker network
+`proxy`, and an SSH deploy user that can run Docker.
 
 ```bash
-sudo mkdir -p /opt/touch-game
-sudo chown "$USER":"$USER" /opt/touch-game
-printf 'SITE_ADDRESS=game.example.ru\n' > /opt/touch-game/.env
+sudo mkdir -p /srv/projects/almaz-game1
+sudo chown "$USER":"$USER" /srv/projects/almaz-game1
 ```
 
-Point the domain's A record to the VPS before the first deployment. Without a
-domain, use `SITE_ADDRESS=:80` and open the server by IP over HTTP.
+Point the domain's A record to the VPS, issue its certificate, and add the
+server block from `deploy/nginx-site.conf.example` to
+`/srv/infrastructure/proxy.conf`. Validate nginx before restarting only the
+shared proxy.
 
 ## GitHub Actions secrets
 
@@ -34,4 +35,5 @@ Add the repository variable `DEPLOY_ENABLED=true` after all secrets are ready.
 For a non-standard SSH port, also add `VPS_PORT`; otherwise port 22 is used.
 
 Every push to `main` then runs the automated deployment. It can also be started
-manually from the Actions tab.
+manually from the Actions tab. The workflow never publishes an application
+port and does not change UFW.
