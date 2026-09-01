@@ -42,8 +42,16 @@ test("keeps local game data and adult controls in the product source", async () 
   assert.match(gameApp, /RegistrationDialog/);
   assert.match(gameApp, /Новый игрок/);
   assert.match(gameApp, /LeaderboardScreen/);
+  assert.match(gameApp, /Результаты игроков/);
+  assert.match(gameApp, /FEEDBACK_DURATION_MS = 2400/);
   assert.match(gameApp, /requestFullscreen/);
   assert.match(gameData, /ROUND_SIZE = 20/);
+  assert.equal(gameData.match(/\{ id: "l[123]-/g)?.length, 60);
+  assert.equal(gameData.match(/\{ id: "l1-/g)?.length, 20);
+  assert.equal(gameData.match(/\{ id: "l2-/g)?.length, 20);
+  assert.equal(gameData.match(/\{ id: "l3-/g)?.length, 20);
+  assert.match(gameData, /FoodCategory = "good" \| "harmful"/);
+  assert.match(storage, /level\?: GameLevel/);
   assert.match(storage, /indexedDB\.open/);
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
 });

@@ -1,4 +1,4 @@
-import type { FoodCategory } from "./game-data";
+import type { FoodCategory, GameLevel } from "./game-data";
 
 export type Player = {
   id: string;
@@ -22,6 +22,7 @@ export type GameSession = {
   playerId: string;
   playerName: string;
   playerAvatar: string;
+  level?: GameLevel;
   score: number;
   correctCount: number;
   totalCount: number;

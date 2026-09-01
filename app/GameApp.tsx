@@ -4,6 +4,7 @@ import {
   ArrowLeft,
   BarChart3,
   BookOpen,
+  Castle,
   Check,
   Delete as DeleteIcon,
   Download,
@@ -11,6 +12,8 @@ import {
   Play,
   RotateCcw,
   Star,
+  Sun,
+  Trees,
   Trophy,
   UserRoundPlus,
   Volume2,
@@ -19,8 +22,8 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { PointerEvent as ReactPointerEvent } from "react";
-import { FOODS, makeRound } from "./game-data";
-import type { FoodCategory, FoodItem } from "./game-data";
+import { FOODS, LEVELS, makeRound } from "./game-data";
+import type { FoodCategory, FoodItem, GameLevel } from "./game-data";
 import {
   exportLocalData,
   listPlayers,
@@ -30,11 +33,12 @@ import {
 } from "./storage";
 import type { AnswerRecord, GameSession, Player } from "./storage";
 
-type View = "profiles" | "game" | "results" | "leaderboard" | "admin";
+type View = "profiles" | "levels" | "game" | "results" | "leaderboard" | "admin";
 type Feedback = { correct: boolean; title: string; detail: string } | null;
 type AcceptedDrop = { category: FoodCategory; rotation: number } | null;
 
 const ADMIN_PIN = "5553";
+const FEEDBACK_DURATION_MS = 2400;
 const KEYBOARD_ROWS = [
   ["Й", "Ц", "У", "К", "Е", "Н", "Г", "Ш", "Щ", "З", "Х"],
   ["Ф", "Ы", "В", "А", "П", "Р", "О", "Л", "Д", "Ж", "Э"],
@@ -125,6 +129,7 @@ export function GameApp() {
   const [storageWarning, setStorageWarning] = useState(false);
   const [loading, setLoading] = useState(true);
   const [soundEnabled, setSoundEnabled] = useState(true);
+  const [currentLevel, setCurrentLevel] = useState<GameLevel>(1);
 
   const [round, setRound] = useState<FoodItem[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -144,13 +149,14 @@ export function GameApp() {
   const [pinError, setPinError] = useState(false);
 
   const goodBasketRef = useRef<HTMLButtonElement>(null);
-  const sometimesBasketRef = useRef<HTMLButtonElement>(null);
+  const harmfulBasketRef = useRef<HTMLButtonElement>(null);
   const productCardRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{ pointerId: number; x: number; y: number } | null>(null);
   const roundStartedAtRef = useRef(0);
   const itemStartedAtRef = useRef(0);
 
   const currentFood = round[currentIndex];
+  const levelDefinition = LEVELS.find((level) => level.id === currentLevel) ?? LEVELS[0];
   const learnedFacts = useMemo(
     () => answers
       .slice(-4)
@@ -196,16 +202,18 @@ export function GameApp() {
     };
   }, []);
 
-  const leaderboardAll = useMemo(() => getBestSessions(sessions), [sessions]);
-  const leaderboardToday = useMemo(
-    () => getBestSessions(sessions.filter((session) => isToday(session.finishedAt))),
-    [sessions],
-  );
+  const selectPlayer = (player: Player) => {
+    setCurrentPlayer(player);
+    setResult(null);
+    setView("levels");
+    document.documentElement.requestFullscreen?.().catch(() => undefined);
+  };
 
-  const startRound = (player = currentPlayer) => {
+  const startRound = (level = currentLevel, player = currentPlayer) => {
     if (!player) return;
     setCurrentPlayer(player);
-    setRound(makeRound());
+    setCurrentLevel(level);
+    setRound(makeRound(level));
     setCurrentIndex(0);
     setScore(0);
     setStreak(0);
@@ -220,7 +228,6 @@ export function GameApp() {
     roundStartedAtRef.current = Date.now();
     itemStartedAtRef.current = Date.now();
     setView("game");
-    document.documentElement.requestFullscreen?.().catch(() => undefined);
   };
 
   const createPlayer = async (name: string, avatar: string, color: string) => {
@@ -238,14 +245,14 @@ export function GameApp() {
     } catch {
       setStorageWarning(true);
     }
-    startRound(player);
+    selectPlayer(player);
   };
 
   const detectDropTarget = (clientX: number, clientY: number): FoodCategory | null => {
     const inRect = (rect: DOMRect | undefined) =>
       Boolean(rect && clientX >= rect.left && clientX <= rect.right && clientY >= rect.top && clientY <= rect.bottom);
     if (inRect(goodBasketRef.current?.getBoundingClientRect())) return "good";
-    if (inRect(sometimesBasketRef.current?.getBoundingClientRect())) return "sometimes";
+    if (inRect(harmfulBasketRef.current?.getBoundingClientRect())) return "harmful";
     return null;
   };
 
@@ -261,6 +268,7 @@ export function GameApp() {
       playerId: currentPlayer.id,
       playerName: currentPlayer.name,
       playerAvatar: currentPlayer.avatar,
+      level: currentLevel,
       score: finalScore,
       correctCount: finalCorrectCount,
       totalCount: round.length,
@@ -321,14 +329,14 @@ export function GameApp() {
         setCurrentIndex((index) => index + 1);
         itemStartedAtRef.current = Date.now();
       }
-    }, 1250);
+    }, FEEDBACK_DURATION_MS);
   };
 
   const acceptProduct = (selected: FoodCategory) => {
     if (!currentFood || feedback || acceptedDrop) return;
 
     const productRect = productCardRef.current?.getBoundingClientRect();
-    const basket = selected === "good" ? goodBasketRef.current : sometimesBasketRef.current;
+    const basket = selected === "good" ? goodBasketRef.current : harmfulBasketRef.current;
     const basketRect = basket?.getBoundingClientRect();
 
     if (productRect && basketRect) {
@@ -433,10 +441,18 @@ export function GameApp() {
           sessions={sessions}
           loading={loading}
           storageWarning={storageWarning}
-          onPlayer={startRound}
+          onPlayer={selectPlayer}
           onNewPlayer={() => setRegistrationOpen(true)}
           onLeaderboard={() => setView("leaderboard")}
           onAdultAccess={openAdultAccess}
+        />
+      )}
+
+      {view === "levels" && currentPlayer && (
+        <LevelSelectScreen
+          player={currentPlayer}
+          onLevel={(level) => startRound(level)}
+          onBack={() => setView("profiles")}
         />
       )}
 
@@ -448,6 +464,7 @@ export function GameApp() {
               <span>{currentPlayer.name}</span>
             </div>
             <div className="round-progress" aria-label={`Пройдено ${currentIndex} из ${round.length} продуктов`}>
+              <span className="level-chip">Уровень {currentLevel}</span>
               <div className="progress-track"><span style={{ width: `${(currentIndex / round.length) * 100}%` }} /></div>
               <strong>{currentIndex + 1} / {round.length}</strong>
             </div>
@@ -503,13 +520,15 @@ export function GameApp() {
               </div>
 
               <button
-                ref={sometimesBasketRef}
+                ref={harmfulBasketRef}
                 type="button"
-                className={`basket basket-sometimes ${dropTarget === "sometimes" ? "is-target" : ""} ${acceptedDrop?.category === "sometimes" ? "is-accepting" : ""}`}
-                onClick={() => acceptProduct("sometimes")}
+                className={`basket basket-harmful ${dropTarget === "harmful" ? "is-target" : ""} ${acceptedDrop?.category === "harmful" ? "is-accepting" : ""}`}
+                onClick={() => acceptProduct("harmful")}
                 disabled={Boolean(feedback)}
               >
-                <span className="basket-symbol" aria-hidden="true">!</span><strong>Иногда<br />и понемногу</strong>
+                <span className="basket-symbol" aria-hidden="true">!</span>
+                <strong>Вредно</strong>
+                {levelDefinition.harmfulHint && <small>{levelDefinition.harmfulHint}</small>}
               </button>
             </section>
 
@@ -518,7 +537,7 @@ export function GameApp() {
               {learnedFacts.length ? (
                 <ol className="facts-list">
                   {learnedFacts.map((food) => (
-                    <li key={food.id} className={food.category === "good" ? "fact-good" : "fact-sometimes"}>
+                    <li key={food.id} className={food.category === "good" ? "fact-good" : "fact-harmful"}>
                       <span className="fact-emoji" aria-hidden="true">{food.emoji}</span>
                       <span><strong>{food.name}</strong><small>{food.fact}</small></span>
                     </li>
@@ -544,11 +563,23 @@ export function GameApp() {
       )}
 
       {view === "results" && result && (
-        <ResultsScreen result={result} onAgain={() => startRound()} onLeaderboard={() => setView("leaderboard")} onProfiles={() => setView("profiles")} />
+        <ResultsScreen
+          result={result}
+          onAgain={() => startRound(result.level ?? 1)}
+          onNextLevel={(result.level ?? 1) < 3 ? () => startRound(((result.level ?? 1) + 1) as GameLevel) : undefined}
+          onLeaderboard={() => setView("leaderboard")}
+          onLevels={() => setView("levels")}
+          onProfiles={() => setView("profiles")}
+        />
       )}
 
       {view === "leaderboard" && (
-        <LeaderboardScreen today={leaderboardToday} all={leaderboardAll} currentPlayerId={currentPlayer?.id} onBack={() => setView(result ? "results" : "profiles")} />
+        <LeaderboardScreen
+          sessions={sessions}
+          initialLevel={currentLevel}
+          currentPlayerId={currentPlayer?.id}
+          onBack={() => setView(result ? "results" : currentPlayer ? "levels" : "profiles")}
+        />
       )}
 
       {view === "admin" && (
@@ -616,6 +647,51 @@ function ProfilesScreen({
   );
 }
 
+function LevelSelectScreen({
+  player,
+  onLevel,
+  onBack,
+}: {
+  player: Player;
+  onLevel: (level: GameLevel) => void;
+  onBack: () => void;
+}) {
+  return (
+    <section className="screen levels-screen">
+      <header className="screen-header">
+        <button className="header-command" type="button" onClick={onBack}><ArrowLeft />Назад</button>
+        <div className="player-chip" aria-label={`Игрок: ${player.name}`}>
+          <span className="player-avatar" style={{ backgroundColor: player.color }} aria-hidden="true">{player.avatar}</span>
+          <span>{player.name}</span>
+        </div>
+        <span className="header-spacer" />
+      </header>
+      <div className="levels-content">
+        <p className="eyebrow">Выбери приключение</p>
+        <h1>На какой уровень отправимся?</h1>
+        <div className="level-grid">
+          {LEVELS.map((level) => (
+            <button
+              className={`level-card level-card-${level.id}`}
+              type="button"
+              key={level.id}
+              onClick={() => onLevel(level.id)}
+            >
+              <span className="level-icon" aria-hidden="true">
+                {level.id === 1 ? <Sun /> : level.id === 2 ? <Trees /> : <Castle />}
+              </span>
+              <span className="level-number">{level.name}</span>
+              <strong>{level.subtitle}</strong>
+              <small>{level.description}</small>
+              <span className="level-play"><Play fill="currentColor" />Играть</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function RegistrationDialog({ onClose, onCreate }: { onClose: () => void; onCreate: (name: string, avatar: string, color: string) => void }) {
   const [name, setName] = useState("");
   const [avatarIndex, setAvatarIndex] = useState(0);
@@ -654,12 +730,27 @@ function RegistrationDialog({ onClose, onCreate }: { onClose: () => void; onCrea
   );
 }
 
-function ResultsScreen({ result, onAgain, onLeaderboard, onProfiles }: { result: GameSession; onAgain: () => void; onLeaderboard: () => void; onProfiles: () => void }) {
+function ResultsScreen({
+  result,
+  onAgain,
+  onNextLevel,
+  onLeaderboard,
+  onLevels,
+  onProfiles,
+}: {
+  result: GameSession;
+  onAgain: () => void;
+  onNextLevel?: () => void;
+  onLeaderboard: () => void;
+  onLevels: () => void;
+  onProfiles: () => void;
+}) {
   const stars = result.accuracy >= 90 ? 3 : result.accuracy >= 70 ? 2 : 1;
   const title = stars === 3 ? "Отлично!" : stars === 2 ? "Хорошая работа!" : "Продолжим тренироваться!";
   return (
     <section className="screen results-screen">
       <div className="result-celebration" aria-hidden="true">{[0, 1, 2].map((index) => <Star key={index} className={index < stars ? "earned-star" : "empty-star"} fill="currentColor" />)}</div>
+      <p className="eyebrow">Уровень {result.level ?? 1} пройден</p>
       <h1>{title}</h1><p className="result-player">{result.playerAvatar} {result.playerName}</p>
       <div className="result-metrics">
         <div><strong>{result.score}</strong><span>очков</span></div>
@@ -667,17 +758,38 @@ function ResultsScreen({ result, onAgain, onLeaderboard, onProfiles }: { result:
         <div><strong>{formatDuration(result.durationMs)}</strong><span>время</span></div>
       </div>
       <div className="result-actions">
-        <button className="primary-command" type="button" onClick={onAgain}><RotateCcw />Играть ещё</button>
+        {onNextLevel ? (
+          <button className="primary-command" type="button" onClick={onNextLevel}><Play />Следующий уровень</button>
+        ) : (
+          <button className="primary-command" type="button" onClick={onAgain}><RotateCcw />Играть ещё</button>
+        )}
+        {onNextLevel && <button className="secondary-command" type="button" onClick={onAgain}><RotateCcw />Повторить</button>}
         <button className="secondary-command" type="button" onClick={onLeaderboard}><Trophy />Рейтинг</button>
+        <button className="secondary-command" type="button" onClick={onLevels}><BookOpen />Все уровни</button>
         <button className="secondary-command" type="button" onClick={onProfiles}><ArrowLeft />Другой игрок</button>
       </div>
     </section>
   );
 }
 
-function LeaderboardScreen({ today, all, currentPlayerId, onBack }: { today: GameSession[]; all: GameSession[]; currentPlayerId?: string; onBack: () => void }) {
+function LeaderboardScreen({
+  sessions,
+  initialLevel,
+  currentPlayerId,
+  onBack,
+}: {
+  sessions: GameSession[];
+  initialLevel: GameLevel;
+  currentPlayerId?: string;
+  onBack: () => void;
+}) {
   const [range, setRange] = useState<"today" | "all">("today");
-  const entries = range === "today" ? today : all;
+  const [level, setLevel] = useState<GameLevel>(initialLevel);
+  const entries = useMemo(
+    () => getBestSessions(sessions.filter((session) =>
+      (session.level ?? 1) === level && (range === "all" || isToday(session.finishedAt)))),
+    [level, range, sessions],
+  );
   return (
     <section className="screen leaderboard-screen">
       <header className="screen-header">
@@ -685,6 +797,13 @@ function LeaderboardScreen({ today, all, currentPlayerId, onBack }: { today: Gam
         <div className="brand-mark"><Trophy aria-hidden="true" /><strong>Лучшие игроки</strong></div><span className="header-spacer" />
       </header>
       <div className="leaderboard-content">
+        <div className="segmented-control level-segments" aria-label="Уровень рейтинга">
+          {LEVELS.map((item) => (
+            <button className={level === item.id ? "is-active" : ""} type="button" key={item.id} onClick={() => setLevel(item.id)}>
+              {item.name}
+            </button>
+          ))}
+        </div>
         <div className="segmented-control" aria-label="Период рейтинга">
           <button className={range === "today" ? "is-active" : ""} type="button" onClick={() => setRange("today")}>Сегодня</button>
           <button className={range === "all" ? "is-active" : ""} type="button" onClick={() => setRange("all")}>Всё время</button>
@@ -712,7 +831,39 @@ function AdminScreen({ players, sessions, onExport, onClose }: { players: Player
   const accuracy = totalAnswers ? Math.round((totalCorrect / totalAnswers) * 100) : 0;
   const mistakeCounts = new Map<string, number>();
   sessions.forEach((session) => session.answers.filter((answer) => !answer.correct).forEach((answer) => mistakeCounts.set(answer.foodId, (mistakeCounts.get(answer.foodId) ?? 0) + 1)));
-  const hardest = [...mistakeCounts.entries()].sort((left, right) => right[1] - left[1]).slice(0, 5).map(([foodId, count]) => ({ food: FOODS.find((item) => item.id === foodId), count }));
+  const hardest = [...mistakeCounts.entries()].sort((left, right) => right[1] - left[1]).slice(0, 5).map(([foodId, count]) => ({ foodId, food: FOODS.find((item) => item.id === foodId), count }));
+  const rowsByPlayer = new Map<string, {
+    id: string;
+    name: string;
+    avatar: string;
+    games: number;
+    best: Record<GameLevel, number>;
+  }>();
+
+  players.forEach((player) => rowsByPlayer.set(player.id, {
+    id: player.id,
+    name: player.name,
+    avatar: player.avatar,
+    games: 0,
+    best: { 1: 0, 2: 0, 3: 0 },
+  }));
+  sessions.forEach((session) => {
+    const row = rowsByPlayer.get(session.playerId) ?? {
+      id: session.playerId,
+      name: session.playerName,
+      avatar: session.playerAvatar,
+      games: 0,
+      best: { 1: 0, 2: 0, 3: 0 } as Record<GameLevel, number>,
+    };
+    const level = session.level ?? 1;
+    row.games += 1;
+    row.best[level] = Math.max(row.best[level], session.score);
+    rowsByPlayer.set(session.playerId, row);
+  });
+  const playerRows = [...rowsByPlayer.values()].sort((left, right) =>
+    Math.max(...Object.values(right.best)) - Math.max(...Object.values(left.best)) ||
+    left.name.localeCompare(right.name, "ru"),
+  );
 
   return (
     <section className="screen admin-screen">
@@ -726,10 +877,34 @@ function AdminScreen({ players, sessions, onExport, onClose }: { players: Player
           <div><BarChart3 /><strong>{sessions.length}</strong><span>игр</span></div>
           <div><Check /><strong>{accuracy}%</strong><span>точность</span></div>
         </div>
+        <section className="player-results-section">
+          <div className="admin-section-heading">
+            <div><h2>Результаты игроков</h2><p>Лучший результат на каждом уровне, сохранённый на этом столе</p></div>
+            <Trophy aria-hidden="true" />
+          </div>
+          {playerRows.length ? (
+            <div className="player-results-scroll">
+              <table className="player-results-table">
+                <thead><tr><th>Игрок</th><th>Уровень 1</th><th>Уровень 2</th><th>Уровень 3</th><th>Игр</th></tr></thead>
+                <tbody>
+                  {playerRows.map((row) => (
+                    <tr key={row.id}>
+                      <td><span aria-hidden="true">{row.avatar}</span><strong>{row.name}</strong></td>
+                      <td>{row.best[1] || "—"}</td>
+                      <td>{row.best[2] || "—"}</td>
+                      <td>{row.best[3] || "—"}</td>
+                      <td>{row.games}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : <p className="admin-empty">Игроки появятся после первой регистрации.</p>}
+        </section>
         <section className="hardest-section">
           <h2>Где чаще ошибаются</h2>
           {hardest.length ? (
-            <div className="hardest-list">{hardest.map(({ food, count }) => <div key={food?.id ?? count}><span aria-hidden="true">{food?.emoji}</span><strong>{food?.name ?? "Продукт"}</strong><b>{count}</b></div>)}</div>
+            <div className="hardest-list">{hardest.map(({ foodId, food, count }) => <div key={foodId}><span aria-hidden="true">{food?.emoji ?? "?"}</span><strong>{food?.name ?? "Продукт из прошлой версии"}</strong><b>{count}</b></div>)}</div>
           ) : <p className="admin-empty">Статистика появится после первой игры.</p>}
         </section>
         <button className="primary-command export-command" type="button" onClick={onExport} disabled={!players.length && !sessions.length}><Download />Экспорт статистики</button>
