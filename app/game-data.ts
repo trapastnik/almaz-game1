@@ -122,3 +122,7 @@ export function makeRound(level: GameLevel): FoodItem[] {
 
   return shuffled.slice(0, ROUND_SIZE);
 }
+
+export function getFoodImage(food: FoodItem): string | null {
+  return food.level === 1 ? `/products/level-1/${food.id}.webp` : null;
+}

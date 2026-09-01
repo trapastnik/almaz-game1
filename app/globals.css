@@ -735,6 +735,12 @@ h2 {
   line-height: 1;
 }
 
+.fact-image {
+  width: 42px;
+  height: 42px;
+  object-fit: contain;
+}
+
 .fact-good { color: var(--green); }
 .fact-harmful { color: var(--coral); }
 
@@ -810,9 +816,17 @@ h2 {
     box-shadow 220ms ease;
 }
 
-.product-card > span {
+.product-card > span,
+.product-emoji {
   font-size: clamp(116px, 17vh, 210px);
   line-height: 1;
+  pointer-events: none;
+}
+
+.product-image {
+  width: 92%;
+  height: 92%;
+  object-fit: contain;
   pointer-events: none;
 }
 
@@ -1768,6 +1782,11 @@ h2 {
 
   .fact-emoji {
     font-size: 27px;
+  }
+
+  .fact-image {
+    width: 34px;
+    height: 34px;
   }
 
   .facts-list strong { font-size: 14px; }

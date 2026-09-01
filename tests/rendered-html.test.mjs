@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
 import test from "node:test";
 
 const projectRoot = new URL("../", import.meta.url);
@@ -28,7 +28,7 @@ test("renders the game entry screen", async () => {
 });
 
 test("keeps local game data and adult controls in the product source", async () => {
-  const [gameApp, gameData, storage, packageJson, styles, sunnyTheme, forestTheme, spaceTheme] = await Promise.all([
+  const [gameApp, gameData, storage, packageJson, styles, sunnyTheme, forestTheme, spaceTheme, productAssets] = await Promise.all([
     readFile(new URL("app/GameApp.tsx", projectRoot), "utf8"),
     readFile(new URL("app/game-data.ts", projectRoot), "utf8"),
     readFile(new URL("app/storage.ts", projectRoot), "utf8"),
@@ -37,6 +37,7 @@ test("keeps local game data and adult controls in the product source", async () 
     readFile(new URL("public/themes/sunny-meadow.webp", projectRoot)),
     readFile(new URL("public/themes/story-forest.webp", projectRoot)),
     readFile(new URL("public/themes/space-kitchen.webp", projectRoot)),
+    readdir(new URL("public/products/level-1/", projectRoot)),
   ]);
 
   assert.match(gameApp, /Вход для взрослых/);
@@ -57,6 +58,7 @@ test("keeps local game data and adult controls in the product source", async () 
   assert.equal(gameData.match(/\{ id: "l2-/g)?.length, 20);
   assert.equal(gameData.match(/\{ id: "l3-/g)?.length, 20);
   assert.match(gameData, /FoodCategory = "good" \| "harmful"/);
+  assert.match(gameData, /getFoodImage/);
   assert.match(storage, /level\?: GameLevel/);
   assert.match(storage, /indexedDB\.open/);
   assert.match(styles, /sunny-meadow\.webp/);
@@ -65,5 +67,6 @@ test("keeps local game data and adult controls in the product source", async () 
   assert.ok(sunnyTheme.length > 50_000);
   assert.ok(forestTheme.length > 50_000);
   assert.ok(spaceTheme.length > 50_000);
+  assert.equal(productAssets.filter((file) => file.endsWith(".webp")).length, 20);
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
 });

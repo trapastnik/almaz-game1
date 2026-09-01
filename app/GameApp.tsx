@@ -24,7 +24,8 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { PointerEvent as ReactPointerEvent } from "react";
-import { FOODS, LEVELS, makeRound } from "./game-data";
+import Image from "next/image";
+import { FOODS, LEVELS, getFoodImage, makeRound } from "./game-data";
 import type { FoodCategory, FoodItem, GameLevel } from "./game-data";
 import {
   exportLocalData,
@@ -540,7 +541,7 @@ export function GameApp() {
                       : `translate3d(${dragOffset.x}px, ${dragOffset.y}px, 0)`,
                   }}
                 >
-                  <span aria-hidden="true">{currentFood.emoji}</span>
+                  <FoodArtwork food={currentFood} />
                 </div>
                 <p className="product-name">{currentFood.name}</p>
               </div>
@@ -564,7 +565,7 @@ export function GameApp() {
                 <ol className="facts-list">
                   {learnedFacts.map((food) => (
                     <li key={food.id} className={food.category === "good" ? "fact-good" : "fact-harmful"}>
-                      <span className="fact-emoji" aria-hidden="true">{food.emoji}</span>
+                      <FoodArtwork food={food} compact />
                       <span><strong>{food.name}</strong><small>{food.fact}</small></span>
                     </li>
                   ))}
@@ -621,6 +622,27 @@ export function GameApp() {
       )}
     </main>
   );
+}
+
+function FoodArtwork({ food, compact = false }: { food: FoodItem; compact?: boolean }) {
+  const image = getFoodImage(food);
+
+  if (image) {
+    return (
+      <Image
+        className={compact ? "fact-image" : "product-image"}
+        src={image}
+        alt=""
+        width={720}
+        height={720}
+        draggable={false}
+        unoptimized
+        priority={!compact}
+      />
+    );
+  }
+
+  return <span className={compact ? "fact-emoji" : "product-emoji"} aria-hidden="true">{food.emoji}</span>;
 }
 
 function ProfilesScreen({
