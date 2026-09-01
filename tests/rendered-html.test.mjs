@@ -28,11 +28,15 @@ test("renders the game entry screen", async () => {
 });
 
 test("keeps local game data and adult controls in the product source", async () => {
-  const [gameApp, gameData, storage, packageJson] = await Promise.all([
+  const [gameApp, gameData, storage, packageJson, styles, sunnyTheme, forestTheme, spaceTheme] = await Promise.all([
     readFile(new URL("app/GameApp.tsx", projectRoot), "utf8"),
     readFile(new URL("app/game-data.ts", projectRoot), "utf8"),
     readFile(new URL("app/storage.ts", projectRoot), "utf8"),
     readFile(new URL("package.json", projectRoot), "utf8"),
+    readFile(new URL("app/globals.css", projectRoot), "utf8"),
+    readFile(new URL("public/themes/sunny-meadow.webp", projectRoot)),
+    readFile(new URL("public/themes/story-forest.webp", projectRoot)),
+    readFile(new URL("public/themes/space-kitchen.webp", projectRoot)),
   ]);
 
   assert.match(gameApp, /Вход для взрослых/);
@@ -44,6 +48,8 @@ test("keeps local game data and adult controls in the product source", async () 
   assert.match(gameApp, /LeaderboardScreen/);
   assert.match(gameApp, /Результаты игроков/);
   assert.match(gameApp, /FEEDBACK_DURATION_MS = 2400/);
+  assert.match(gameApp, /THEME_STORAGE_KEY/);
+  assert.match(gameApp, /Стиль игры/);
   assert.match(gameApp, /requestFullscreen/);
   assert.match(gameData, /ROUND_SIZE = 20/);
   assert.equal(gameData.match(/\{ id: "l[123]-/g)?.length, 60);
@@ -53,5 +59,11 @@ test("keeps local game data and adult controls in the product source", async () 
   assert.match(gameData, /FoodCategory = "good" \| "harmful"/);
   assert.match(storage, /level\?: GameLevel/);
   assert.match(storage, /indexedDB\.open/);
+  assert.match(styles, /sunny-meadow\.webp/);
+  assert.match(styles, /story-forest\.webp/);
+  assert.match(styles, /space-kitchen\.webp/);
+  assert.ok(sunnyTheme.length > 50_000);
+  assert.ok(forestTheme.length > 50_000);
+  assert.ok(spaceTheme.length > 50_000);
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
 });

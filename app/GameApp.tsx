@@ -9,7 +9,9 @@ import {
   Delete as DeleteIcon,
   Download,
   LockKeyhole,
+  Palette,
   Play,
+  Rocket,
   RotateCcw,
   Star,
   Sun,
@@ -34,11 +36,18 @@ import {
 import type { AnswerRecord, GameSession, Player } from "./storage";
 
 type View = "profiles" | "levels" | "game" | "results" | "leaderboard" | "admin";
+type ThemeId = "sunny" | "forest" | "space";
 type Feedback = { correct: boolean; title: string; detail: string } | null;
 type AcceptedDrop = { category: FoodCategory; rotation: number } | null;
 
 const ADMIN_PIN = "5553";
 const FEEDBACK_DURATION_MS = 2400;
+const THEME_STORAGE_KEY = "healthy-food-theme";
+const THEMES: { id: ThemeId; label: string }[] = [
+  { id: "sunny", label: "Поляна" },
+  { id: "forest", label: "Лес" },
+  { id: "space", label: "Космос" },
+];
 const KEYBOARD_ROWS = [
   ["Й", "Ц", "У", "К", "Е", "Н", "Г", "Ш", "Щ", "З", "Х"],
   ["Ф", "Ы", "В", "А", "П", "Р", "О", "Л", "Д", "Ж", "Э"],
@@ -130,6 +139,7 @@ export function GameApp() {
   const [loading, setLoading] = useState(true);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [currentLevel, setCurrentLevel] = useState<GameLevel>(1);
+  const [theme, setTheme] = useState<ThemeId>("sunny");
 
   const [round, setRound] = useState<FoodItem[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -167,6 +177,13 @@ export function GameApp() {
   );
 
   useEffect(() => {
+    const savedTheme = window.localStorage.getItem(THEME_STORAGE_KEY);
+    const restoreTheme = window.setTimeout(() => {
+      if (savedTheme === "sunny" || savedTheme === "forest" || savedTheme === "space") {
+        setTheme(savedTheme);
+      }
+    }, 0);
+
     Promise.all([listPlayers(), listSessions()])
       .then(([savedPlayers, savedSessions]) => {
         setPlayers(savedPlayers);
@@ -174,7 +191,14 @@ export function GameApp() {
       })
       .catch(() => setStorageWarning(true))
       .finally(() => setLoading(false));
+
+    return () => window.clearTimeout(restoreTheme);
   }, []);
+
+  const chooseTheme = (nextTheme: ThemeId) => {
+    setTheme(nextTheme);
+    window.localStorage.setItem(THEME_STORAGE_KEY, nextTheme);
+  };
 
   useEffect(() => {
     const preventDefault = (event: Event) => event.preventDefault();
@@ -434,17 +458,19 @@ export function GameApp() {
   };
 
   return (
-    <main className="app-shell">
+    <main className={`app-shell theme-${theme}`}>
       {view === "profiles" && (
         <ProfilesScreen
           players={players}
           sessions={sessions}
           loading={loading}
           storageWarning={storageWarning}
+          theme={theme}
           onPlayer={selectPlayer}
           onNewPlayer={() => setRegistrationOpen(true)}
           onLeaderboard={() => setView("leaderboard")}
           onAdultAccess={openAdultAccess}
+          onTheme={chooseTheme}
         />
       )}
 
@@ -602,24 +628,44 @@ function ProfilesScreen({
   sessions,
   loading,
   storageWarning,
+  theme,
   onPlayer,
   onNewPlayer,
   onLeaderboard,
   onAdultAccess,
+  onTheme,
 }: {
   players: Player[];
   sessions: GameSession[];
   loading: boolean;
   storageWarning: boolean;
+  theme: ThemeId;
   onPlayer: (player: Player) => void;
   onNewPlayer: () => void;
   onLeaderboard: () => void;
   onAdultAccess: () => void;
+  onTheme: (theme: ThemeId) => void;
 }) {
   return (
     <section className="screen profiles-screen">
       <header className="screen-header">
         <div className="brand-mark"><span aria-hidden="true">🍎</span><strong>Вредно-полезно</strong></div>
+        <div className="theme-switcher" role="group" aria-label="Стиль игры">
+          <span className="theme-switcher-label"><Palette aria-hidden="true" />Стиль</span>
+          {THEMES.map((item) => (
+            <button
+              className={theme === item.id ? "is-active" : ""}
+              type="button"
+              key={item.id}
+              onClick={() => onTheme(item.id)}
+              aria-pressed={theme === item.id}
+              title={item.label}
+            >
+              {item.id === "sunny" ? <Sun aria-hidden="true" /> : item.id === "forest" ? <Trees aria-hidden="true" /> : <Rocket aria-hidden="true" />}
+              <span>{item.label}</span>
+            </button>
+          ))}
+        </div>
         <div className="screen-header-actions">
           <button className="header-command" type="button" onClick={onLeaderboard} disabled={!sessions.length}><Trophy aria-hidden="true" />Рейтинг</button>
           <button className="header-command adult-command" type="button" onClick={onAdultAccess}><LockKeyhole aria-hidden="true" />Вход для взрослых</button>
