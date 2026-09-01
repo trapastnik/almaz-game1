@@ -28,7 +28,7 @@ test("renders the game entry screen", async () => {
 });
 
 test("keeps local game data and adult controls in the product source", async () => {
-  const [gameApp, gameData, storage, packageJson, styles, sunnyTheme, forestTheme, spaceTheme, productAssets] = await Promise.all([
+  const [gameApp, gameData, storage, packageJson, styles, sunnyTheme, forestTheme, spaceTheme, levelOneAssets, levelTwoAssets, levelThreeAssets] = await Promise.all([
     readFile(new URL("app/GameApp.tsx", projectRoot), "utf8"),
     readFile(new URL("app/game-data.ts", projectRoot), "utf8"),
     readFile(new URL("app/storage.ts", projectRoot), "utf8"),
@@ -38,6 +38,8 @@ test("keeps local game data and adult controls in the product source", async () 
     readFile(new URL("public/themes/story-forest.webp", projectRoot)),
     readFile(new URL("public/themes/space-kitchen.webp", projectRoot)),
     readdir(new URL("public/products/level-1/", projectRoot)),
+    readdir(new URL("public/products/level-2/", projectRoot)),
+    readdir(new URL("public/products/level-3/", projectRoot)),
   ]);
 
   assert.match(gameApp, /Вход для взрослых/);
@@ -72,6 +74,15 @@ test("keeps local game data and adult controls in the product source", async () 
   assert.ok(sunnyTheme.length > 50_000);
   assert.ok(forestTheme.length > 50_000);
   assert.ok(spaceTheme.length > 50_000);
-  assert.equal(productAssets.filter((file) => file.endsWith(".webp")).length, 20);
+  assert.equal(levelOneAssets.filter((file) => file.endsWith(".webp")).length, 20);
+  assert.equal(levelTwoAssets.filter((file) => file.endsWith(".webp")).length, 20);
+  assert.equal(levelThreeAssets.filter((file) => file.endsWith(".webp")).length, 20);
+  [levelOneAssets, levelTwoAssets, levelThreeAssets].forEach((assets, index) => {
+    const level = index + 1;
+    const ids = [...gameData.matchAll(new RegExp(`id: "(l${level}-[^"]+)"`, "g"))]
+      .map((match) => `${match[1]}.webp`)
+      .sort();
+    assert.deepEqual(assets.filter((file) => file.endsWith(".webp")).sort(), ids);
+  });
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
 });

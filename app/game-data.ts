@@ -124,5 +124,5 @@ export function makeRound(level: GameLevel): FoodItem[] {
 }
 
 export function getFoodImage(food: FoodItem): string | null {
-  return food.level === 1 ? `/products/level-1/${food.id}.webp` : null;
+  return `/products/level-${food.level}/${food.id}.webp`;
 }
