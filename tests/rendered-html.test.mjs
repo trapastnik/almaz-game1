@@ -43,6 +43,7 @@ test("keeps local game data and adult controls in the product source", async () 
   assert.match(gameApp, /Вход для взрослых/);
   assert.match(gameApp, /ADMIN_PIN/);
   assert.match(gameApp, /facts-rail/);
+  assert.doesNotMatch(gameApp, /slice\(-4\)/);
   assert.doesNotMatch(gameApp, /secret-corner|CORNER_SEQUENCE/);
   assert.match(gameApp, /RegistrationDialog/);
   assert.match(gameApp, /Новый игрок/);
@@ -66,6 +67,8 @@ test("keeps local game data and adult controls in the product source", async () 
   assert.match(styles, /sunny-meadow\.webp/);
   assert.match(styles, /story-forest\.webp/);
   assert.match(styles, /space-kitchen\.webp/);
+  assert.match(styles, /touch-action: pan-y/);
+  assert.match(styles, /facts-list::-webkit-scrollbar/);
   assert.ok(sunnyTheme.length > 50_000);
   assert.ok(forestTheme.length > 50_000);
   assert.ok(spaceTheme.length > 50_000);

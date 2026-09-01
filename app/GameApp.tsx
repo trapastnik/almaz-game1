@@ -22,7 +22,7 @@ import {
   VolumeX,
   X,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PointerEvent as ReactPointerEvent } from "react";
 import Image from "next/image";
 import { FOODS, LEVELS, getFoodImage, makeRound } from "./game-data";
@@ -155,6 +155,7 @@ export function GameApp() {
   const [dragging, setDragging] = useState(false);
   const [dropTarget, setDropTarget] = useState<FoodCategory | null>(null);
   const [acceptedDrop, setAcceptedDrop] = useState<AcceptedDrop>(null);
+  const [factsScroll, setFactsScroll] = useState({ visible: false, thumbSize: 100, thumbTop: 0 });
 
   const [pinOpen, setPinOpen] = useState(false);
   const [pin, setPin] = useState("");
@@ -163,6 +164,7 @@ export function GameApp() {
   const goodBasketRef = useRef<HTMLButtonElement>(null);
   const harmfulBasketRef = useRef<HTMLButtonElement>(null);
   const productCardRef = useRef<HTMLDivElement>(null);
+  const factsListRef = useRef<HTMLOListElement>(null);
   const dragRef = useRef<{ pointerId: number; x: number; y: number } | null>(null);
   const roundStartedAtRef = useRef(0);
   const itemStartedAtRef = useRef(0);
@@ -171,12 +173,33 @@ export function GameApp() {
   const levelDefinition = LEVELS.find((level) => level.id === currentLevel) ?? LEVELS[0];
   const learnedFacts = useMemo(
     () => answers
-      .slice(-4)
+      .slice()
       .reverse()
       .map((answer) => round.find((food) => food.id === answer.foodId))
       .filter((food): food is FoodItem => Boolean(food)),
     [answers, round],
   );
+
+  const syncFactsScrollbar = useCallback(() => {
+    const list = factsListRef.current;
+    if (!list) return;
+    const visible = list.scrollHeight > list.clientHeight + 1;
+    const thumbSize = visible ? Math.max(14, (list.clientHeight / list.scrollHeight) * 100) : 100;
+    const thumbTop = visible
+      ? (list.scrollTop / (list.scrollHeight - list.clientHeight)) * (100 - thumbSize)
+      : 0;
+
+    setFactsScroll({ visible, thumbSize, thumbTop });
+  }, []);
+
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(syncFactsScrollbar);
+    window.addEventListener("resize", syncFactsScrollbar);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.removeEventListener("resize", syncFactsScrollbar);
+    };
+  }, [learnedFacts.length, syncFactsScrollbar]);
 
   useEffect(() => {
     const savedTheme = window.localStorage.getItem(THEME_STORAGE_KEY);
@@ -566,9 +589,13 @@ export function GameApp() {
             </section>
 
             <aside className="facts-rail" aria-label="Факты о продуктах" aria-live="polite">
-              <div className="facts-heading"><BookOpen aria-hidden="true" /><strong>Запомни</strong></div>
+              <div className="facts-heading">
+                <BookOpen aria-hidden="true" />
+                <strong>Запомни</strong>
+                <span>{learnedFacts.length} / {round.length}</span>
+              </div>
               {learnedFacts.length ? (
-                <ol className="facts-list">
+                <ol ref={factsListRef} className="facts-list" onScroll={syncFactsScrollbar}>
                   {learnedFacts.map((food) => (
                     <li key={food.id} className={food.category === "good" ? "fact-good" : "fact-harmful"}>
                       <FoodArtwork food={food} compact />
@@ -579,6 +606,9 @@ export function GameApp() {
               ) : (
                 <div className="facts-empty" aria-hidden="true"><BookOpen /></div>
               )}
+              <div className={`facts-scrollbar ${factsScroll.visible ? "is-visible" : ""}`} aria-hidden="true">
+                <span style={{ height: `${factsScroll.thumbSize}%`, top: `${factsScroll.thumbTop}%` }} />
+              </div>
             </aside>
           </div>
 
