@@ -49,6 +49,8 @@ test("keeps local game data and adult controls in the product source", async () 
   assert.match(gameApp, /LeaderboardScreen/);
   assert.match(gameApp, /Результаты игроков/);
   assert.match(gameApp, /FEEDBACK_DURATION_MS = 2400/);
+  assert.match(gameApp, /PRODUCT_DROP_DURATION_MS = 460/);
+  assert.match(gameApp, /}, PRODUCT_DROP_DURATION_MS\);/);
   assert.match(gameApp, /THEME_STORAGE_KEY/);
   assert.match(gameApp, /Стиль игры/);
   assert.match(gameApp, /requestFullscreen/);

@@ -43,6 +43,7 @@ type AcceptedDrop = { category: FoodCategory; rotation: number } | null;
 
 const ADMIN_PIN = "5553";
 const FEEDBACK_DURATION_MS = 2400;
+const PRODUCT_DROP_DURATION_MS = 460;
 const THEME_STORAGE_KEY = "healthy-food-theme";
 const THEMES: { id: ThemeId; label: string }[] = [
   { id: "sunny", label: "Поляна" },
@@ -227,6 +228,12 @@ export function GameApp() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!feedback) return;
+    const hideFeedback = window.setTimeout(() => setFeedback(null), FEEDBACK_DURATION_MS);
+    return () => window.clearTimeout(hideFeedback);
+  }, [feedback]);
+
   const selectPlayer = (player: Player) => {
     setCurrentPlayer(player);
     setResult(null);
@@ -314,7 +321,7 @@ export function GameApp() {
   };
 
   const submitAnswer = (selected: FoodCategory) => {
-    if (!currentFood || feedback) return;
+    if (!currentFood || acceptedDrop) return;
     const responseMs = Date.now() - itemStartedAtRef.current;
     const correct = selected === currentFood.category;
     const nextStreak = correct ? streak + 1 : 0;
@@ -344,7 +351,6 @@ export function GameApp() {
     playTone(correct, soundEnabled);
 
     window.setTimeout(() => {
-      setFeedback(null);
       setDragOffset({ x: 0, y: 0 });
       setDropTarget(null);
       setAcceptedDrop(null);
@@ -354,11 +360,11 @@ export function GameApp() {
         setCurrentIndex((index) => index + 1);
         itemStartedAtRef.current = Date.now();
       }
-    }, FEEDBACK_DURATION_MS);
+    }, PRODUCT_DROP_DURATION_MS);
   };
 
   const acceptProduct = (selected: FoodCategory) => {
-    if (!currentFood || feedback || acceptedDrop) return;
+    if (!currentFood || acceptedDrop) return;
 
     const productRect = productCardRef.current?.getBoundingClientRect();
     const basket = selected === "good" ? goodBasketRef.current : harmfulBasketRef.current;
@@ -384,7 +390,7 @@ export function GameApp() {
   };
 
   const handlePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
-    if (feedback) return;
+    if (acceptedDrop) return;
     event.currentTarget.setPointerCapture(event.pointerId);
     dragRef.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY };
     setDragging(true);
@@ -518,7 +524,7 @@ export function GameApp() {
                 type="button"
                 className={`basket basket-good ${dropTarget === "good" ? "is-target" : ""} ${acceptedDrop?.category === "good" ? "is-accepting" : ""}`}
                 onClick={() => acceptProduct("good")}
-                disabled={Boolean(feedback)}
+                disabled={Boolean(acceptedDrop)}
               >
                 <span className="basket-symbol" aria-hidden="true"><Check /></span><strong>Полезно</strong>
               </button>
@@ -551,7 +557,7 @@ export function GameApp() {
                 type="button"
                 className={`basket basket-harmful ${dropTarget === "harmful" ? "is-target" : ""} ${acceptedDrop?.category === "harmful" ? "is-accepting" : ""}`}
                 onClick={() => acceptProduct("harmful")}
-                disabled={Boolean(feedback)}
+                disabled={Boolean(acceptedDrop)}
               >
                 <span className="basket-symbol" aria-hidden="true">!</span>
                 <strong>Вредно</strong>
