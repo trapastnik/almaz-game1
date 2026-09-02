@@ -20,7 +20,7 @@ export type FoodItem = {
 };
 
 export const ROUND_SIZE = 20;
-const PRODUCT_IMAGE_VERSION = "20260902-3";
+const PRODUCT_IMAGE_VERSION = "20260902-4";
 
 export const LEVELS: LevelDefinition[] = [
   {
