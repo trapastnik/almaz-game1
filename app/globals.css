@@ -834,6 +834,7 @@ h2 {
 .product-card {
   z-index: 8;
   display: grid;
+  overflow: hidden;
   width: min(31vh, 340px);
   min-width: 220px;
   aspect-ratio: 1;
@@ -875,8 +876,8 @@ h2 {
 }
 
 .product-image {
-  width: 92%;
-  height: 92%;
+  width: 100%;
+  height: 100%;
   object-fit: contain;
   pointer-events: none;
 }

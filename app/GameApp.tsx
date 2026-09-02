@@ -204,7 +204,7 @@ export function GameApp() {
 
   useEffect(() => {
     round.forEach((food) => {
-      const source = getFoodImage(food);
+      const source = getFoodImage(food, true);
       if (!source) return;
       const image = new window.Image();
       image.src = source;
@@ -674,7 +674,7 @@ export function GameApp() {
 }
 
 function FoodArtwork({ food, compact = false }: { food: FoodItem; compact?: boolean }) {
-  const image = getFoodImage(food);
+  const image = getFoodImage(food, !compact);
 
   if (image) {
     return (

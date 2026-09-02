@@ -124,6 +124,7 @@ export function makeRound(level: GameLevel): FoodItem[] {
   return shuffled.slice(0, ROUND_SIZE);
 }
 
-export function getFoodImage(food: FoodItem): string | null {
-  return `/products/level-${food.level}/${food.id}.webp?v=${PRODUCT_IMAGE_VERSION}`;
+export function getFoodImage(food: FoodItem, large = false): string | null {
+  const collection = large ? "products-large" : "products";
+  return `/${collection}/level-${food.level}/${food.id}.webp?v=${PRODUCT_IMAGE_VERSION}`;
 }
