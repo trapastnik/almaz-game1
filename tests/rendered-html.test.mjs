@@ -64,6 +64,7 @@ test("keeps local game data and adult controls in the product source", async () 
   assert.equal(gameData.match(/\{ id: "l3-/g)?.length, 20);
   assert.match(gameData, /FoodCategory = "good" \| "harmful"/);
   assert.match(gameData, /getFoodImage/);
+  assert.match(gameData, /PRODUCT_IMAGE_VERSION/);
   assert.match(storage, /level\?: GameLevel/);
   assert.match(storage, /indexedDB\.open/);
   assert.match(styles, /sunny-meadow\.webp/);

@@ -20,6 +20,7 @@ export type FoodItem = {
 };
 
 export const ROUND_SIZE = 20;
+const PRODUCT_IMAGE_VERSION = "20260902-2";
 
 export const LEVELS: LevelDefinition[] = [
   {
@@ -124,5 +125,5 @@ export function makeRound(level: GameLevel): FoodItem[] {
 }
 
 export function getFoodImage(food: FoodItem): string | null {
-  return `/products/level-${food.level}/${food.id}.webp`;
+  return `/products/level-${food.level}/${food.id}.webp?v=${PRODUCT_IMAGE_VERSION}`;
 }
