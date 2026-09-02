@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PointerEvent as ReactPointerEvent } from "react";
+import { flushSync } from "react-dom";
 import Image from "next/image";
 import { FOODS, LEVELS, getFoodImage, makeRound } from "./game-data";
 import type { FoodCategory, FoodItem, GameLevel } from "./game-data";
@@ -202,6 +203,15 @@ export function GameApp() {
   }, [learnedFacts.length, syncFactsScrollbar]);
 
   useEffect(() => {
+    round.forEach((food) => {
+      const source = getFoodImage(food);
+      if (!source) return;
+      const image = new window.Image();
+      image.src = source;
+    });
+  }, [round]);
+
+  useEffect(() => {
     const savedTheme = window.localStorage.getItem(THEME_STORAGE_KEY);
     const restoreTheme = window.setTimeout(() => {
       if (savedTheme === "sunny" || savedTheme === "forest" || savedTheme === "space") {
@@ -374,13 +384,15 @@ export function GameApp() {
     playTone(correct, soundEnabled);
 
     window.setTimeout(() => {
-      setDragOffset({ x: 0, y: 0 });
-      setDropTarget(null);
-      setAcceptedDrop(null);
       if (currentIndex + 1 >= round.length) {
         void finishRound(nextAnswers, nextScore, nextCorrectCount);
       } else {
-        setCurrentIndex((index) => index + 1);
+        flushSync(() => {
+          setCurrentIndex((index) => index + 1);
+          setDragOffset({ x: 0, y: 0 });
+          setDropTarget(null);
+          setAcceptedDrop(null);
+        });
         itemStartedAtRef.current = Date.now();
       }
     }, PRODUCT_DROP_DURATION_MS);
@@ -556,6 +568,7 @@ export function GameApp() {
                 <p className="eyebrow">Продукт {currentIndex + 1}</p>
                 <h1 id="game-question">Куда положим?</h1>
                 <div
+                  key={currentFood.id}
                   ref={productCardRef}
                   className={`product-card ${dragging ? "is-dragging" : ""} ${acceptedDrop ? "is-accepted" : ""}`}
                   role="img"
