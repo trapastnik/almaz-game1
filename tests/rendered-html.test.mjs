@@ -59,6 +59,7 @@ test("keeps local game data and adult controls in the product source", async () 
   assert.match(gameApp, /}, PRODUCT_DROP_DURATION_MS\);/);
   assert.match(gameApp, /flushSync/);
   assert.match(gameApp, /key=\{currentFood\.id\}/);
+  assert.match(gameApp, /product-drag-item/);
   assert.match(gameApp, /THEME_STORAGE_KEY/);
   assert.match(gameApp, /Стиль игры/);
   assert.match(gameApp, /requestFullscreen/);

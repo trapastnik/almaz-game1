@@ -834,7 +834,6 @@ h2 {
 .product-card {
   z-index: 8;
   display: grid;
-  overflow: hidden;
   width: min(31vh, 340px);
   min-width: 220px;
   aspect-ratio: 1;
@@ -844,31 +843,36 @@ h2 {
   outline: 3px solid #bfd0dd;
   background: #ffffff;
   box-shadow: 0 15px 0 #c7d5df, 0 24px 42px rgba(62, 81, 105, 0.18);
+}
+
+.product-drag-item {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  place-items: center;
   cursor: grab;
   touch-action: none;
-  transition: transform 180ms ease, box-shadow 180ms ease;
+  transition: transform 180ms ease, filter 180ms ease;
   will-change: transform;
 }
 
-.product-card.is-dragging {
-  box-shadow: 0 8px 0 #b7c8d4, 0 30px 48px rgba(43, 60, 82, 0.3);
+.product-drag-item.is-dragging {
+  filter: drop-shadow(0 20px 16px rgba(43, 60, 82, 0.26));
   cursor: grabbing;
   transition: none;
 }
 
-.product-card.is-accepted {
+.product-drag-item.is-accepted {
   opacity: 0;
   filter: blur(2px);
-  box-shadow: 0 0 0 rgba(62, 81, 105, 0);
   pointer-events: none;
   transition:
     transform 440ms cubic-bezier(0.18, 0.82, 0.24, 1),
     opacity 160ms ease 260ms,
-    filter 180ms ease 220ms,
-    box-shadow 220ms ease;
+    filter 180ms ease 220ms;
 }
 
-.product-card > span,
+.product-drag-item > span,
 .product-emoji {
   font-size: clamp(116px, 17vh, 210px);
   line-height: 1;

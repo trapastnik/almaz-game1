@@ -164,7 +164,7 @@ export function GameApp() {
 
   const goodBasketRef = useRef<HTMLButtonElement>(null);
   const harmfulBasketRef = useRef<HTMLButtonElement>(null);
-  const productCardRef = useRef<HTMLDivElement>(null);
+  const productDragRef = useRef<HTMLDivElement>(null);
   const factsListRef = useRef<HTMLOListElement>(null);
   const dragRef = useRef<{ pointerId: number; x: number; y: number } | null>(null);
   const roundStartedAtRef = useRef(0);
@@ -401,7 +401,7 @@ export function GameApp() {
   const acceptProduct = (selected: FoodCategory) => {
     if (!currentFood || acceptedDrop) return;
 
-    const productRect = productCardRef.current?.getBoundingClientRect();
+    const productRect = productDragRef.current?.getBoundingClientRect();
     const basket = selected === "good" ? goodBasketRef.current : harmfulBasketRef.current;
     const basketRect = basket?.getBoundingClientRect();
 
@@ -567,23 +567,25 @@ export function GameApp() {
               <div className="product-area">
                 <p className="eyebrow">Продукт {currentIndex + 1}</p>
                 <h1 id="game-question">Куда положим?</h1>
-                <div
-                  key={currentFood.id}
-                  ref={productCardRef}
-                  className={`product-card ${dragging ? "is-dragging" : ""} ${acceptedDrop ? "is-accepted" : ""}`}
-                  role="img"
-                  aria-label={currentFood.name}
-                  onPointerDown={handlePointerDown}
-                  onPointerMove={handlePointerMove}
-                  onPointerUp={handlePointerUp}
-                  onPointerCancel={resetDrag}
-                  style={{
-                    transform: acceptedDrop
-                      ? `translate3d(${dragOffset.x}px, ${dragOffset.y}px, 0) rotate(${acceptedDrop.rotation}deg) scale(0.08)`
-                      : `translate3d(${dragOffset.x}px, ${dragOffset.y}px, 0)`,
-                  }}
-                >
-                  <FoodArtwork food={currentFood} />
+                <div className="product-card">
+                  <div
+                    key={currentFood.id}
+                    ref={productDragRef}
+                    className={`product-drag-item ${dragging ? "is-dragging" : ""} ${acceptedDrop ? "is-accepted" : ""}`}
+                    role="img"
+                    aria-label={currentFood.name}
+                    onPointerDown={handlePointerDown}
+                    onPointerMove={handlePointerMove}
+                    onPointerUp={handlePointerUp}
+                    onPointerCancel={resetDrag}
+                    style={{
+                      transform: acceptedDrop
+                        ? `translate3d(${dragOffset.x}px, ${dragOffset.y}px, 0) rotate(${acceptedDrop.rotation}deg) scale(0.08)`
+                        : `translate3d(${dragOffset.x}px, ${dragOffset.y}px, 0)`,
+                    }}
+                  >
+                    <FoodArtwork food={currentFood} />
+                  </div>
                 </div>
                 <p className="product-name">{currentFood.name}</p>
               </div>
