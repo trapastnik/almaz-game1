@@ -79,6 +79,7 @@ test("keeps local game data and adult controls in the product source", async () 
   assert.match(styles, /space-kitchen\.webp/);
   assert.match(styles, /touch-action: pan-y/);
   assert.match(styles, /facts-list::-webkit-scrollbar/);
+  assert.match(styles, /min-height: calc\(2\.1em \+ 22px\)/);
   assert.ok(sunnyTheme.length > 50_000);
   assert.ok(forestTheme.length > 50_000);
   assert.ok(spaceTheme.length > 50_000);
