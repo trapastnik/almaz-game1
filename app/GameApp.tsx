@@ -676,7 +676,7 @@ export function GameApp() {
 }
 
 function FoodArtwork({ food, compact = false }: { food: FoodItem; compact?: boolean }) {
-  const image = getFoodImage(food, !compact);
+  const image = getFoodImage(food, true);
 
   if (image) {
     return (
