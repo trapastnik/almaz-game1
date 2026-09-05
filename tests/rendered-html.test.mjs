@@ -64,11 +64,15 @@ test("keeps local game data and adult controls in the product source", async () 
   assert.match(gameApp, /THEME_STORAGE_KEY/);
   assert.match(gameApp, /Стиль игры/);
   assert.match(gameApp, /requestFullscreen/);
-  assert.match(gameData, /ROUND_SIZE = 20/);
-  assert.equal(gameData.match(/\{ id: "l[123]-/g)?.length, 60);
+  assert.match(gameData, /ROUND_SIZE = 26/);
+  assert.equal(gameData.match(/\{ id: "l[123]-/g)?.length, 66);
   assert.equal(gameData.match(/\{ id: "l1-/g)?.length, 20);
   assert.equal(gameData.match(/\{ id: "l2-/g)?.length, 20);
-  assert.equal(gameData.match(/\{ id: "l3-/g)?.length, 20);
+  assert.equal(gameData.match(/\{ id: "l3-/g)?.length, 26);
+  assert.match(gameData, /subtitle: "Для детей"/);
+  assert.match(gameData, /subtitle: "Для детей и взрослых"/);
+  assert.match(gameData, /subtitle: "Для взрослых"/);
+  assert.doesNotMatch(gameData, /глазкам|глазок|зубки|зубок|косточки|животику/);
   assert.match(gameData, /FoodCategory = "good" \| "harmful"/);
   assert.match(gameData, /getFoodImage/);
   assert.match(gameData, /PRODUCT_IMAGE_VERSION/);
@@ -85,10 +89,10 @@ test("keeps local game data and adult controls in the product source", async () 
   assert.ok(spaceTheme.length > 50_000);
   assert.equal(levelOneAssets.filter((file) => file.endsWith(".webp")).length, 20);
   assert.equal(levelTwoAssets.filter((file) => file.endsWith(".webp")).length, 20);
-  assert.equal(levelThreeAssets.filter((file) => file.endsWith(".webp")).length, 20);
+  assert.equal(levelThreeAssets.filter((file) => file.endsWith(".webp")).length, 26);
   assert.equal(largeLevelOneAssets.filter((file) => file.endsWith(".webp")).length, 20);
   assert.equal(largeLevelTwoAssets.filter((file) => file.endsWith(".webp")).length, 20);
-  assert.equal(largeLevelThreeAssets.filter((file) => file.endsWith(".webp")).length, 20);
+  assert.equal(largeLevelThreeAssets.filter((file) => file.endsWith(".webp")).length, 26);
   [levelOneAssets, levelTwoAssets, levelThreeAssets].forEach((assets, index) => {
     const level = index + 1;
     const ids = [...gameData.matchAll(new RegExp(`id: "(l${level}-[^"]+)"`, "g"))]
