@@ -72,6 +72,9 @@ test("keeps local game data and adult controls in the product source", async () 
   assert.match(gameData, /subtitle: "Для детей"/);
   assert.match(gameData, /subtitle: "Для детей и взрослых"/);
   assert.match(gameData, /subtitle: "Для взрослых"/);
+  assert.match(gameData, /Самый простой уровень – подходит для самых маленьких/);
+  assert.match(gameData, /Уровень средней сложности – подходит для семейной игры/);
+  assert.match(gameData, /Самый сложный уровень – для тех, кто разбирается в нюансах питания/);
   assert.doesNotMatch(gameData, /глазкам|глазок|зубки|зубок|косточки|животику/);
   assert.match(gameData, /FoodCategory = "good" \| "harmful"/);
   assert.match(gameData, /getFoodImage/);
