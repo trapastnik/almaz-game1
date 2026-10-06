@@ -32,8 +32,26 @@ export type GameSession = {
   answers: AnswerRecord[];
 };
 
+export type AnalyticsAnswer = AnswerRecord & {
+  foodName: string;
+};
+
+export type AnalyticsEvent = {
+  eventId: string;
+  gameId: "healthy-food";
+  gameVersion: string;
+  level: GameLevel;
+  score: number;
+  correctCount: number;
+  totalCount: number;
+  durationMs: number;
+  finishedAt: string;
+  answers: AnalyticsAnswer[];
+  queuedAt: string;
+};
+
 const DATABASE_NAME = "touch-table-games";
-const DATABASE_VERSION = 1;
+const DATABASE_VERSION = 2;
 
 function openDatabase(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -55,6 +73,11 @@ function openDatabase(): Promise<IDBDatabase> {
         const sessions = database.createObjectStore("sessions", { keyPath: "id" });
         sessions.createIndex("playerId", "playerId", { unique: false });
         sessions.createIndex("finishedAt", "finishedAt", { unique: false });
+      }
+
+      if (!database.objectStoreNames.contains("analyticsOutbox")) {
+        const outbox = database.createObjectStore("analyticsOutbox", { keyPath: "eventId" });
+        outbox.createIndex("queuedAt", "queuedAt", { unique: false });
       }
     };
 
@@ -108,6 +131,40 @@ export async function saveSession(session: GameSession): Promise<void> {
   transaction.objectStore("sessions").put(session);
   await transactionDone(transaction);
   database.close();
+}
+
+export async function queueAnalyticsEvent(event: AnalyticsEvent): Promise<void> {
+  const database = await openDatabase();
+  const transaction = database.transaction("analyticsOutbox", "readwrite");
+  transaction.objectStore("analyticsOutbox").put(event);
+  await transactionDone(transaction);
+  database.close();
+}
+
+export async function listPendingAnalytics(limit = 50): Promise<AnalyticsEvent[]> {
+  const database = await openDatabase();
+  const transaction = database.transaction("analyticsOutbox", "readonly");
+  const events = await requestResult(transaction.objectStore("analyticsOutbox").getAll() as IDBRequest<AnalyticsEvent[]>);
+  database.close();
+  return events.sort((left, right) => left.queuedAt.localeCompare(right.queuedAt)).slice(0, limit);
+}
+
+export async function deleteAnalyticsEvents(eventIds: string[]): Promise<void> {
+  if (!eventIds.length) return;
+  const database = await openDatabase();
+  const transaction = database.transaction("analyticsOutbox", "readwrite");
+  const store = transaction.objectStore("analyticsOutbox");
+  eventIds.forEach((eventId) => store.delete(eventId));
+  await transactionDone(transaction);
+  database.close();
+}
+
+export async function countPendingAnalytics(): Promise<number> {
+  const database = await openDatabase();
+  const transaction = database.transaction("analyticsOutbox", "readonly");
+  const count = await requestResult(transaction.objectStore("analyticsOutbox").count());
+  database.close();
+  return count;
 }
 
 export async function exportLocalData(): Promise<{ players: Player[]; sessions: GameSession[]; exportedAt: string }> {

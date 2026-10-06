@@ -21,6 +21,13 @@ server block from `deploy/nginx-site.conf.example` to
 `/srv/infrastructure/proxy.conf`. Validate nginx before restarting only the
 shared proxy.
 
+Create `/srv/projects/almaz-game1/.env` from `.env.example` before starting the
+release. Generate three different long random secrets. The database is reachable
+only through the internal Compose network; do not add `ports` to either service.
+
+The analytics API and dashboard must be enabled only in the HTTPS server block.
+The temporary IP/HTTP configuration intentionally exposes the game alone.
+
 Until a domain is ready, `deploy/nginx-ip.conf.example` documents the temporary
 HTTP route for `188.225.35.200`. It still reaches the app only through the
 shared `proxy` network and does not publish port 3000.

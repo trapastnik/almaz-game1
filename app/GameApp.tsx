@@ -8,10 +8,12 @@ import {
   Check,
   Delete as DeleteIcon,
   Download,
+  Globe2,
   LockKeyhole,
   Palette,
   Play,
   Rocket,
+  RefreshCw,
   RotateCcw,
   Star,
   Sun,
@@ -20,6 +22,8 @@ import {
   UserRoundPlus,
   Volume2,
   VolumeX,
+  Wifi,
+  WifiOff,
   X,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -36,6 +40,13 @@ import {
   saveSession,
 } from "./storage";
 import type { AnswerRecord, GameSession, Player } from "./storage";
+import {
+  activateAnalytics,
+  flushAnalytics,
+  getAnalyticsState,
+  queueSessionForAnalytics,
+} from "./analytics";
+import type { AnalyticsState } from "./analytics";
 
 type View = "profiles" | "levels" | "game" | "results" | "leaderboard" | "admin";
 type ThemeId = "sunny" | "forest" | "space";
@@ -143,6 +154,12 @@ export function GameApp() {
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [currentLevel, setCurrentLevel] = useState<GameLevel>(1);
   const [theme, setTheme] = useState<ThemeId>("sunny");
+  const [analyticsState, setAnalyticsState] = useState<AnalyticsState>({
+    configured: false,
+    pending: 0,
+    syncing: false,
+    online: true,
+  });
 
   const [round, setRound] = useState<FoodItem[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -228,6 +245,39 @@ export function GameApp() {
       .finally(() => setLoading(false));
 
     return () => window.clearTimeout(restoreTheme);
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    const refresh = async (sync: boolean) => {
+      if (sync) setAnalyticsState((current) => ({ ...current, syncing: true }));
+      try {
+        const state = sync ? await flushAnalytics() : await getAnalyticsState();
+        if (active) setAnalyticsState(state);
+      } catch (error) {
+        if (active) {
+          setAnalyticsState((current) => ({
+            ...current,
+            syncing: false,
+            online: navigator.onLine,
+            error: error instanceof Error ? error.message : "Ошибка синхронизации",
+          }));
+        }
+      }
+    };
+
+    const handleOnline = () => void refresh(true);
+    const handleOffline = () => setAnalyticsState((current) => ({ ...current, online: false, syncing: false }));
+    void refresh(true);
+    const timer = window.setInterval(() => void refresh(true), 60_000);
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
   }, []);
 
   const chooseTheme = (nextTheme: ThemeId) => {
@@ -348,6 +398,12 @@ export function GameApp() {
     setView("results");
     try {
       await saveSession(session);
+    } catch {
+      setStorageWarning(true);
+    }
+    try {
+      setAnalyticsState((current) => ({ ...current, pending: current.pending + 1, syncing: current.configured }));
+      setAnalyticsState(await queueSessionForAnalytics(session));
     } catch {
       setStorageWarning(true);
     }
@@ -497,6 +553,25 @@ export function GameApp() {
     } catch {
       setStorageWarning(true);
     }
+  };
+
+  const connectAnalytics = async (code: string) => {
+    setAnalyticsState((current) => ({ ...current, syncing: true, error: undefined }));
+    try {
+      const state = await activateAnalytics(code);
+      setAnalyticsState(state);
+      return state;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Не удалось подключить стол";
+      setAnalyticsState((current) => ({ ...current, syncing: false, error: message }));
+      throw error;
+    }
+  };
+
+  const syncAnalyticsNow = async () => {
+    setAnalyticsState((current) => ({ ...current, syncing: true, error: undefined }));
+    const state = await flushAnalytics();
+    setAnalyticsState(state);
   };
 
   return (
@@ -661,7 +736,15 @@ export function GameApp() {
       )}
 
       {view === "admin" && (
-        <AdminScreen players={players} sessions={sessions} onExport={() => void downloadStatistics()} onClose={() => setView("profiles")} />
+        <AdminScreen
+          players={players}
+          sessions={sessions}
+          analytics={analyticsState}
+          onActivate={connectAnalytics}
+          onSync={() => void syncAnalyticsNow()}
+          onExport={() => void downloadStatistics()}
+          onClose={() => setView("profiles")}
+        />
       )}
 
       {registrationOpen && (
@@ -834,6 +917,7 @@ function RegistrationDialog({ onClose, onCreate }: { onClose: () => void; onCrea
             <input maxLength={12} value={name} onChange={(event) => setName(event.target.value.replace(/[^A-Za-zА-Яа-яЁё0-9 _-]/g, ""))} placeholder="Например, Маша" />
           </label>
         </div>
+        <p className="profile-privacy-note">Имя или псевдоним хранится только на этом столе и не передаётся в общую статистику.</p>
         <div className="touch-keyboard" aria-label="Экранная клавиатура">
           {KEYBOARD_ROWS.map((row, index) => (
             <div className="keyboard-row" key={index}>{row.map((letter) => <button type="button" key={letter} onClick={() => append(letter)}>{letter}</button>)}</div>
@@ -944,7 +1028,26 @@ function LeaderboardScreen({
   );
 }
 
-function AdminScreen({ players, sessions, onExport, onClose }: { players: Player[]; sessions: GameSession[]; onExport: () => void; onClose: () => void }) {
+function AdminScreen({
+  players,
+  sessions,
+  analytics,
+  onActivate,
+  onSync,
+  onExport,
+  onClose,
+}: {
+  players: Player[];
+  sessions: GameSession[];
+  analytics: AnalyticsState;
+  onActivate: (code: string) => Promise<AnalyticsState>;
+  onSync: () => void;
+  onExport: () => void;
+  onClose: () => void;
+}) {
+  const [activationCode, setActivationCode] = useState("");
+  const [activationError, setActivationError] = useState("");
+  const [connecting, setConnecting] = useState(false);
   const totalAnswers = sessions.reduce((sum, session) => sum + session.totalCount, 0);
   const totalCorrect = sessions.reduce((sum, session) => sum + session.correctCount, 0);
   const accuracy = totalAnswers ? Math.round((totalCorrect / totalAnswers) * 100) : 0;
@@ -983,6 +1086,23 @@ function AdminScreen({ players, sessions, onExport, onClose }: { players: Player
     Math.max(...Object.values(right.best)) - Math.max(...Object.values(left.best)) ||
     left.name.localeCompare(right.name, "ru"),
   );
+
+  const submitActivation = async () => {
+    if (!/^\d{8}$/.test(activationCode)) {
+      setActivationError("Введите 8 цифр из сводной панели");
+      return;
+    }
+    setConnecting(true);
+    setActivationError("");
+    try {
+      await onActivate(activationCode);
+      setActivationCode("");
+    } catch (error) {
+      setActivationError(error instanceof Error ? error.message : "Не удалось подключить стол");
+    } finally {
+      setConnecting(false);
+    }
+  };
 
   return (
     <section className="screen admin-screen">
@@ -1025,6 +1145,46 @@ function AdminScreen({ players, sessions, onExport, onClose }: { players: Player
           {hardest.length ? (
             <div className="hardest-list">{hardest.map(({ foodId, food, count }) => <div key={foodId}><span aria-hidden="true">{food?.emoji ?? "?"}</span><strong>{food?.name ?? "Продукт из прошлой версии"}</strong><b>{count}</b></div>)}</div>
           ) : <p className="admin-empty">Статистика появится после первой игры.</p>}
+        </section>
+        <section className="analytics-section">
+          <div className="admin-section-heading">
+            <div><h2>Сводная аналитика</h2><p>В центр отправляются только обезличенные результаты без имён, аватаров и локальных профилей</p></div>
+            <Globe2 aria-hidden="true" />
+          </div>
+          {analytics.configured && analytics.device ? (
+            <div className="analytics-connected">
+              <div className="analytics-location">
+                <strong>{analytics.device.tableLabel}</strong>
+                <span>{analytics.device.region}, {analytics.device.city}</span>
+                <small>{analytics.device.venue}</small>
+              </div>
+              <div className={`analytics-sync-state ${analytics.online ? "is-online" : "is-offline"}`}>
+                {analytics.online ? <Wifi aria-hidden="true" /> : <WifiOff aria-hidden="true" />}
+                <strong>{analytics.syncing ? "Синхронизация..." : analytics.pending ? `Ожидают отправки: ${analytics.pending}` : "Все результаты отправлены"}</strong>
+                <span>{analytics.lastSync ? `Последняя связь: ${new Date(analytics.lastSync).toLocaleString("ru-RU")}` : "Первая синхронизация ещё не выполнена"}</span>
+              </div>
+              <div className="analytics-actions">
+                <button className="secondary-command" type="button" onClick={onSync} disabled={analytics.syncing}><RefreshCw aria-hidden="true" />Обновить</button>
+                <a className="primary-command" href="/analytics/" target="_blank" rel="noreferrer"><BarChart3 aria-hidden="true" />Открыть сводную панель</a>
+              </div>
+            </div>
+          ) : (
+            <div className="analytics-activation">
+              <div><strong>Стол ещё не подключён</strong><p>Создайте код в сводной панели и введите его здесь один раз.</p></div>
+              <label>
+                <span>Код подключения</span>
+                <input
+                  inputMode="numeric"
+                  maxLength={8}
+                  value={activationCode}
+                  onChange={(event) => setActivationCode(event.target.value.replace(/\D/g, "").slice(0, 8))}
+                  placeholder="8 цифр"
+                />
+              </label>
+              <button className="primary-command" type="button" onClick={() => void submitActivation()} disabled={connecting || activationCode.length !== 8}>{connecting ? "Подключение..." : "Подключить стол"}</button>
+            </div>
+          )}
+          {(activationError || analytics.error) && <p className="analytics-error" role="alert">{activationError || analytics.error}</p>}
         </section>
         <button className="primary-command export-command" type="button" onClick={onExport} disabled={!players.length && !sessions.length}><Download />Экспорт статистики</button>
       </div>

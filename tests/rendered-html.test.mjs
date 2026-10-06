@@ -28,10 +28,12 @@ test("renders the game entry screen", async () => {
 });
 
 test("keeps local game data and adult controls in the product source", async () => {
-  const [gameApp, gameData, storage, packageJson, styles, sunnyTheme, forestTheme, spaceTheme, levelOneAssets, levelTwoAssets, levelThreeAssets, largeLevelOneAssets, largeLevelTwoAssets, largeLevelThreeAssets] = await Promise.all([
+  const [gameApp, gameData, storage, analytics, compose, packageJson, styles, sunnyTheme, forestTheme, spaceTheme, levelOneAssets, levelTwoAssets, levelThreeAssets, largeLevelOneAssets, largeLevelTwoAssets, largeLevelThreeAssets] = await Promise.all([
     readFile(new URL("app/GameApp.tsx", projectRoot), "utf8"),
     readFile(new URL("app/game-data.ts", projectRoot), "utf8"),
     readFile(new URL("app/storage.ts", projectRoot), "utf8"),
+    readFile(new URL("app/analytics.ts", projectRoot), "utf8"),
+    readFile(new URL("compose.yaml", projectRoot), "utf8"),
     readFile(new URL("package.json", projectRoot), "utf8"),
     readFile(new URL("app/globals.css", projectRoot), "utf8"),
     readFile(new URL("public/themes/sunny-meadow.webp", projectRoot)),
@@ -81,6 +83,12 @@ test("keeps local game data and adult controls in the product source", async () 
   assert.match(gameData, /PRODUCT_IMAGE_VERSION/);
   assert.match(storage, /level\?: GameLevel/);
   assert.match(storage, /indexedDB\.open/);
+  assert.match(storage, /analyticsOutbox/);
+  assert.match(analytics, /eventId: createAnalyticsId\(\)/);
+  assert.doesNotMatch(analytics, /playerName|playerAvatar|playerId/);
+  assert.match(compose, /postgres:17-alpine/);
+  assert.match(compose, /analytics-internal/);
+  assert.doesNotMatch(compose, /analytics[\s\S]*?ports:/);
   assert.match(styles, /sunny-meadow\.webp/);
   assert.match(styles, /story-forest\.webp/);
   assert.match(styles, /space-kitchen\.webp/);

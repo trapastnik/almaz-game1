@@ -44,9 +44,13 @@ export default defineConfig(async () => {
   const { cloudflare } = await import("@cloudflare/vite-plugin");
 
   return {
-    server: isCodexSeatbeltSandbox
-      ? { watch: { useFsEvents: false, usePolling: true } }
-      : undefined,
+    server: {
+      ...(isCodexSeatbeltSandbox ? { watch: { useFsEvents: false, usePolling: true } } : {}),
+      proxy: {
+        "/api/analytics": "http://127.0.0.1:3100",
+        "/analytics": "http://127.0.0.1:3100",
+      },
+    },
     plugins: [
       vinext(),
       sites(),

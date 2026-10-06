@@ -1,4 +1,6 @@
 # Temporary HTTP access before a domain and TLS certificate are configured.
+# Central analytics routes are intentionally absent: device tokens and the
+# administrator password must never be transmitted over plain HTTP.
 server {
     listen 80;
     server_name 188.225.35.200;

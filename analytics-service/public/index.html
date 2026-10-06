@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Сводная аналитика игр</title>
+    <link rel="stylesheet" href="/analytics/styles.css">
+    <script src="/analytics/app.js" defer></script>
+  </head>
+  <body>
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">Интерактивные столы</p>
+        <h1>Сводная аналитика</h1>
+      </div>
+      <div class="topbar-actions">
+        <span class="sync-status" id="load-status">Обновление...</span>
+        <a class="button secondary" id="export-link" href="/api/analytics/admin/export.csv">Скачать CSV</a>
+      </div>
+    </header>
+
+    <main>
+      <section class="filters" aria-label="Фильтры аналитики">
+        <label>С даты<input type="date" id="from-date"></label>
+        <label>По дату<input type="date" id="to-date"></label>
+        <label>Регион<select id="region-filter"><option value="">Все регионы</option></select></label>
+        <label>Город<select id="city-filter"><option value="">Все города</option></select></label>
+        <label>Площадка<select id="venue-filter"><option value="">Все площадки</option></select></label>
+        <label>Уровень<select id="level-filter"><option value="">Все уровни</option><option value="1">Уровень 1</option><option value="2">Уровень 2</option><option value="3">Уровень 3</option></select></label>
+        <button class="button primary" id="apply-filters" type="button">Показать</button>
+      </section>
+
+      <section class="metrics" aria-label="Основные показатели">
+        <article><span>Прохождений</span><strong id="metric-sessions">0</strong><small>за выбранный период</small></article>
+        <article><span>Точность</span><strong id="metric-accuracy">0%</strong><small id="metric-answers">0 ответов</small></article>
+        <article><span>Средний балл</span><strong id="metric-score">0</strong><small>за одно прохождение</small></article>
+        <article><span>Столы онлайн</span><strong id="metric-devices">0 / 0</strong><small>передавали данные за 24 часа</small></article>
+      </section>
+
+      <section class="dashboard-grid">
+        <article class="panel trend-panel">
+          <div class="section-heading"><div><p class="eyebrow">Динамика</p><h2>Прохождения по дням</h2></div></div>
+          <div class="trend-chart" id="trend-chart"><p class="empty">Данные пока не поступали</p></div>
+        </article>
+
+        <article class="panel levels-panel">
+          <div class="section-heading"><div><p class="eyebrow">Сложность</p><h2>Уровни игры</h2></div></div>
+          <div class="level-list" id="level-list"><p class="empty">Нет данных</p></div>
+        </article>
+
+        <article class="panel regions-panel">
+          <div class="section-heading"><div><p class="eyebrow">География</p><h2>Сравнение регионов</h2></div></div>
+          <div class="table-scroll"><table><thead><tr><th>Регион</th><th>Игр</th><th>Точность</th><th>Средний балл</th></tr></thead><tbody id="regions-body"></tbody></table></div>
+        </article>
+
+        <article class="panel hardest-panel">
+          <div class="section-heading"><div><p class="eyebrow">Содержание</p><h2>Где чаще ошибаются</h2></div></div>
+          <ol class="hardest-list" id="hardest-list"><li class="empty">Ошибок пока нет</li></ol>
+        </article>
+      </section>
+
+      <section class="devices-section">
+        <div class="section-heading">
+          <div><p class="eyebrow">Оборудование</p><h2>Состояние столов</h2></div>
+          <button class="button primary" id="show-activation" type="button">Добавить стол</button>
+        </div>
+        <div class="table-scroll devices-table"><table><thead><tr><th>Регион</th><th>Город</th><th>Площадка</th><th>Стол</th><th>Последняя связь</th><th>Игр</th><th>Состояние</th></tr></thead><tbody id="devices-body"></tbody></table></div>
+      </section>
+    </main>
+
+    <dialog id="activation-dialog">
+      <form id="activation-form">
+        <div class="dialog-heading"><div><p class="eyebrow">Подключение</p><h2>Новый игровой стол</h2></div><button class="icon-button" id="close-activation" type="button" aria-label="Закрыть">×</button></div>
+        <p class="dialog-note">После создания введите восьмизначный код во взрослом разделе игры. Код действует 7 дней и используется один раз.</p>
+        <label>Регион<input name="region" maxlength="120" required autocomplete="off" placeholder="Например, Московская область"></label>
+        <label>Город<input name="city" maxlength="120" required autocomplete="off" placeholder="Например, Подольск"></label>
+        <label>Площадка<input name="venue" maxlength="160" required autocomplete="off" placeholder="Название учреждения или мероприятия"></label>
+        <label>Название стола<input name="tableLabel" maxlength="120" required autocomplete="off" placeholder="Например, Стол 1"></label>
+        <div class="activation-code" id="activation-code" hidden><span>Код подключения</span><strong></strong><small>Введите его на игровом столе</small></div>
+        <p class="form-error" id="activation-error" role="alert"></p>
+        <button class="button primary wide" type="submit">Создать код</button>
+      </form>
+    </dialog>
+  </body>
+</html>

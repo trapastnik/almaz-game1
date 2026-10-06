@@ -33,6 +33,76 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  analytics:
+    container_name: almaz-game1-analytics
+    build:
+      context: ./analytics-service
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      PORT: 3100
+      DATABASE_URL: postgresql://analytics:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@analytics-db:5432/analytics
+      ANALYTICS_ADMIN_USER: ${ANALYTICS_ADMIN_USER:-admin}
+      ANALYTICS_ADMIN_PASSWORD: ${ANALYTICS_ADMIN_PASSWORD:?set ANALYTICS_ADMIN_PASSWORD in .env}
+      ANALYTICS_TOKEN_PEPPER: ${ANALYTICS_TOKEN_PEPPER:?set ANALYTICS_TOKEN_PEPPER in .env}
+      ANALYTICS_RETENTION_DAYS: ${ANALYTICS_RETENTION_DAYS:-730}
+    expose:
+      - "3100"
+    depends_on:
+      analytics-db:
+        condition: service_healthy
+    networks:
+      - proxy
+      - analytics-internal
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:3100/api/analytics/health"]
+      interval: 15s
+      timeout: 5s
+      start_period: 20s
+      retries: 5
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  analytics-db:
+    container_name: almaz-game1-analytics-db
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: analytics
+      POSTGRES_USER: analytics
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    volumes:
+      - analytics-db-data:/var/lib/postgresql/data
+    networks:
+      - analytics-internal
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U analytics -d analytics"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
 networks:
   proxy:
     external: true
+  analytics-internal:
+    internal: true
+
+volumes:
+  analytics-db-data:
