@@ -1,0 +1,11 @@
+[Unit]
+Description=Check Almaz game TLS certificates twice daily
+
+[Timer]
+OnCalendar=*-*-* 04,16:25:00
+Persistent=true
+RandomizedDelaySec=30m
+Unit=almaz-game1-tls-renew.service
+
+[Install]
+WantedBy=timers.target

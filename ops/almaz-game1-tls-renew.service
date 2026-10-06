@@ -1,0 +1,11 @@
+[Unit]
+Description=Renew TLS certificates for Almaz game
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/srv/projects/almaz-game1/ops/renew-tls.sh
+Nice=10
+
