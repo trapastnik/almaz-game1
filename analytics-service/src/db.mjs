@@ -139,6 +139,16 @@ export function createDatabase({ connectionString, tokenPepper }) {
     return { id: row.id, region: row.region, city: row.city, venue: row.venue, tableLabel: row.table_label };
   }
 
+  async function disableDevice(deviceId) {
+    const result = await pool.query(
+      `UPDATE devices SET disabled_at = now()
+       WHERE id = $1 AND disabled_at IS NULL
+       RETURNING id, disabled_at`,
+      [deviceId],
+    );
+    return result.rows[0] ?? null;
+  }
+
   async function saveEvents(deviceId, events) {
     const client = await pool.connect();
     try {
@@ -291,6 +301,7 @@ export function createDatabase({ connectionString, tokenPepper }) {
     createActivationCode,
     activateDevice,
     findDeviceByToken,
+    disableDevice,
     saveEvents,
     getSummary,
     getCsvRows,

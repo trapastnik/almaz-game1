@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { hashSecret, validateAnalyticsEvent } from "../src/lib.mjs";
+import { csvCell, hashSecret, safeEqual, validateAnalyticsEvent } from "../src/lib.mjs";
 
 const validEvent = {
   eventId: "event_1234567890",
@@ -38,4 +38,15 @@ test("rejects player identity fields", () => {
 test("hashes activation secrets with a server pepper", () => {
   assert.equal(hashSecret("12345678", "first"), hashSecret("12345678", "first"));
   assert.notEqual(hashSecret("12345678", "first"), hashSecret("12345678", "second"));
+});
+
+test("compares admin credentials without leaking their length", () => {
+  assert.equal(safeEqual("admin", "admin"), true);
+  assert.equal(safeEqual("short", "a-much-longer-secret"), false);
+});
+
+test("neutralizes spreadsheet formulas in CSV cells", () => {
+  assert.equal(csvCell("=2+2"), "'=2+2");
+  assert.equal(csvCell("Обычное значение"), "Обычное значение");
+  assert.equal(csvCell("Площадка; 1"), '"Площадка; 1"');
 });

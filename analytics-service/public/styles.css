@@ -159,6 +159,10 @@ tbody tr:hover { background: rgba(37, 117, 185, 0.05); }
 .status-pill { display: inline-flex; padding: 5px 9px; border-radius: 999px; background: #edf1f4; color: var(--muted); font-size: 12px; font-weight: 800; }
 .status-pill.online { background: var(--green-soft); color: #1f754e; }
 .status-pill.stale { background: #fff0dd; color: #986217; }
+.table-action { min-height: 36px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 5px; background: white; color: var(--ink); font: inherit; font-size: 12px; font-weight: 800; cursor: pointer; }
+.table-action.danger { border-color: #e7b4af; color: #a33d35; }
+.table-action:disabled { cursor: wait; opacity: 0.55; }
+.muted-value { color: var(--muted); font-size: 12px; font-weight: 700; }
 
 dialog { width: min(520px, calc(100vw - 28px)); padding: 0; border: 0; border-radius: 8px; box-shadow: 0 24px 70px rgba(28, 43, 58, 0.25); }
 dialog::backdrop { background: rgba(24, 36, 50, 0.55); }

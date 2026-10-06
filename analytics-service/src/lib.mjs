@@ -1,4 +1,4 @@
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 
 const FORBIDDEN_PLAYER_FIELDS = new Set([
   "playerId",
@@ -27,9 +27,15 @@ export function hashSecret(value, pepper) {
 }
 
 export function safeEqual(left, right) {
-  const leftBuffer = Buffer.from(String(left));
-  const rightBuffer = Buffer.from(String(right));
-  return leftBuffer.length === rightBuffer.length && timingSafeEqual(leftBuffer, rightBuffer);
+  const leftBuffer = createHash("sha256").update(String(left)).digest();
+  const rightBuffer = createHash("sha256").update(String(right)).digest();
+  return timingSafeEqual(leftBuffer, rightBuffer);
+}
+
+export function csvCell(value) {
+  let text = value == null ? "" : String(value);
+  if (/^[=+\-@\t\r]/.test(text)) text = `'${text}`;
+  return /[";,\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
 }
 
 function containsForbiddenPlayerField(value) {

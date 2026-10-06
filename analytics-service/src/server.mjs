@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createDatabase } from "./db.mjs";
-import { cleanText, parseDateRange, safeEqual, validateAnalyticsEvent } from "./lib.mjs";
+import { cleanText, csvCell, parseDateRange, safeEqual, validateAnalyticsEvent } from "./lib.mjs";
 
 const requiredEnvironment = ["DATABASE_URL", "ANALYTICS_ADMIN_PASSWORD", "ANALYTICS_TOKEN_PEPPER"];
 for (const name of requiredEnvironment) {
@@ -19,7 +19,36 @@ const database = createDatabase({
   connectionString: process.env.DATABASE_URL,
   tokenPepper: process.env.ANALYTICS_TOKEN_PEPPER,
 });
-const activationAttempts = new Map();
+function createRateLimiter({ limit, windowMs, maximumKeys = 10_000 }) {
+  const attempts = new Map();
+  let lastSweep = Date.now();
+  function recentAttempts(key, now = Date.now()) {
+    return (attempts.get(key) ?? []).filter((time) => now - time < windowMs);
+  }
+  const limiter = (key) => {
+    const now = Date.now();
+    if (now - lastSweep >= windowMs) {
+      for (const [entryKey, times] of attempts) {
+        const recent = times.filter((time) => now - time < windowMs);
+        if (recent.length) attempts.set(entryKey, recent);
+        else attempts.delete(entryKey);
+      }
+      lastSweep = now;
+    }
+    if (!attempts.has(key) && attempts.size >= maximumKeys) return false;
+    const recent = recentAttempts(key, now);
+    recent.push(now);
+    attempts.set(key, recent);
+    return recent.length <= limit;
+  };
+  limiter.blocked = (key) => recentAttempts(key).length >= limit;
+  limiter.clear = (key) => attempts.delete(key);
+  return limiter;
+}
+
+const allowActivationAttempt = createRateLimiter({ limit: 10, windowMs: 15 * 60_000 });
+const allowAdminFailure = createRateLimiter({ limit: 10, windowMs: 15 * 60_000 });
+const allowEventUpload = createRateLimiter({ limit: 300, windowMs: 15 * 60_000 });
 
 function securityHeaders(contentType = "application/json; charset=utf-8") {
   return {
@@ -29,6 +58,8 @@ function securityHeaders(contentType = "application/json; charset=utf-8") {
     "X-Frame-Options": "DENY",
     "Referrer-Policy": "no-referrer",
     "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+    "Cross-Origin-Opener-Policy": "same-origin",
+    "Cross-Origin-Resource-Policy": "same-origin",
     "Content-Security-Policy": "default-src 'self'; style-src 'self'; script-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'",
   };
 }
@@ -70,7 +101,16 @@ function isAdmin(request) {
 }
 
 function requireAdmin(request, response) {
-  if (isAdmin(request)) return true;
+  const address = clientAddress(request);
+  if (allowAdminFailure.blocked(address)) {
+    sendJson(response, 429, { error: "Слишком много попыток входа. Повторите позже" }, { "Retry-After": "900" });
+    return false;
+  }
+  if (isAdmin(request)) {
+    allowAdminFailure.clear(address);
+    return true;
+  }
+  allowAdminFailure(address);
   sendJson(response, 401, { error: "Требуется вход администратора" }, { "WWW-Authenticate": 'Basic realm="Almaz Analytics", charset="UTF-8"' });
   return false;
 }
@@ -80,18 +120,29 @@ function bearerToken(request) {
   return authorization.startsWith("Bearer ") ? authorization.slice(7).trim() : "";
 }
 
-function allowActivationAttempt(request) {
-  const address = cleanText(request.headers["x-real-ip"] || request.socket.remoteAddress || "unknown", 80);
-  const now = Date.now();
-  const recent = (activationAttempts.get(address) ?? []).filter((time) => now - time < 15 * 60_000);
-  recent.push(now);
-  activationAttempts.set(address, recent);
-  return recent.length <= 10;
+function clientAddress(request) {
+  return cleanText(request.headers["x-real-ip"] || request.socket.remoteAddress || "unknown", 80);
 }
 
-function csvCell(value) {
-  const text = value == null ? "" : String(value);
-  return /[";,\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
+function requireJson(request, response) {
+  const contentType = String(request.headers["content-type"] ?? "").split(";", 1)[0].trim().toLowerCase();
+  if (contentType === "application/json") return true;
+  sendJson(response, 415, { error: "Ожидается JSON" });
+  return false;
+}
+
+function requireSameOrigin(request, response) {
+  const origin = request.headers.origin;
+  if (!origin) return true;
+  try {
+    const originUrl = new URL(origin);
+    const protocol = cleanText(request.headers["x-forwarded-proto"], 10) || "http";
+    if (originUrl.protocol === `${protocol}:` && originUrl.host === request.headers.host) return true;
+  } catch {
+    // Invalid origins are rejected below.
+  }
+  sendJson(response, 403, { error: "Недопустимый источник запроса" });
+  return false;
 }
 
 async function serveDashboard(pathname, response) {
@@ -123,7 +174,8 @@ async function handle(request, response) {
   }
 
   if (url.pathname === "/api/analytics/activate" && request.method === "POST") {
-    if (!allowActivationAttempt(request)) return sendJson(response, 429, { error: "Слишком много попыток. Повторите позже" });
+    if (!requireJson(request, response)) return;
+    if (!allowActivationAttempt(clientAddress(request))) return sendJson(response, 429, { error: "Слишком много попыток. Повторите позже" }, { "Retry-After": "900" });
     const body = await readJson(request, 10_000);
     const code = cleanText(body.code, 8);
     if (!/^\d{8}$/.test(code)) return sendJson(response, 400, { error: "Код состоит из 8 цифр" });
@@ -133,9 +185,11 @@ async function handle(request, response) {
   }
 
   if (url.pathname === "/api/analytics/events" && request.method === "POST") {
+    if (!requireJson(request, response)) return;
     const token = bearerToken(request);
     const device = token ? await database.findDeviceByToken(token) : null;
     if (!device) return sendJson(response, 401, { error: "Стол не зарегистрирован" });
+    if (!allowEventUpload(device.id)) return sendJson(response, 429, { error: "Слишком частая отправка результатов" }, { "Retry-After": "900" });
     const body = await readJson(request);
     if (!Array.isArray(body.events) || body.events.length < 1 || body.events.length > 50) {
       return sendJson(response, 400, { error: "В одной отправке должно быть от 1 до 50 событий" });
@@ -152,6 +206,7 @@ async function handle(request, response) {
 
   if (url.pathname === "/api/analytics/admin/activation-codes" && request.method === "POST") {
     if (!requireAdmin(request, response)) return;
+    if (!requireJson(request, response) || !requireSameOrigin(request, response)) return;
     const body = await readJson(request, 20_000);
     try {
       const activation = await database.createActivationCode(body);
@@ -159,6 +214,16 @@ async function handle(request, response) {
     } catch (error) {
       return sendJson(response, 400, { error: error.message });
     }
+  }
+
+  const disableDeviceMatch = url.pathname.match(/^\/api\/analytics\/admin\/devices\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/disable$/i);
+  if (disableDeviceMatch && request.method === "POST") {
+    if (!requireAdmin(request, response)) return;
+    if (!requireJson(request, response) || !requireSameOrigin(request, response)) return;
+    await readJson(request, 1_000);
+    const disabled = await database.disableDevice(disableDeviceMatch[1]);
+    if (!disabled) return sendJson(response, 404, { error: "Активный стол не найден" });
+    return sendJson(response, 200, { deviceId: disabled.id, disabledAt: disabled.disabled_at });
   }
 
   if (url.pathname === "/api/analytics/admin/summary" && request.method === "GET") {
@@ -209,6 +274,11 @@ const server = createServer((request, response) => {
     else response.end();
   });
 });
+
+server.headersTimeout = 15_000;
+server.requestTimeout = 30_000;
+server.keepAliveTimeout = 5_000;
+server.maxRequestsPerSocket = 1_000;
 
 server.listen(port, "0.0.0.0", () => console.log(`Analytics service is listening on ${port}`));
 

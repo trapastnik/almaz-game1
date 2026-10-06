@@ -123,6 +123,24 @@ function renderHardest(rows) {
   }));
 }
 
+async function disableDevice(row, button) {
+  if (!window.confirm(`Отключить «${row.table_label}»? Стол перестанет отправлять результаты, для повторного подключения потребуется новый код.`)) return;
+  button.disabled = true;
+  try {
+    const response = await fetch(`/api/analytics/admin/devices/${row.id}/disable`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{}",
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.error || "Не удалось отключить стол");
+    await loadSummary();
+  } catch (error) {
+    window.alert(error.message);
+    button.disabled = false;
+  }
+}
+
 function renderDevices(rows) {
   const body = document.querySelector("#devices-body");
   body.replaceChildren(...rows.map((row) => {
@@ -134,12 +152,22 @@ function renderDevices(rows) {
     const statusCell = document.createElement("td");
     statusCell.append(make("span", status[0], `status-pill ${status[1]}`));
     tr.append(statusCell);
+    const actionCell = document.createElement("td");
+    if (!row.disabled_at) {
+      const button = make("button", "Отключить", "table-action danger");
+      button.type = "button";
+      button.addEventListener("click", () => void disableDevice(row, button));
+      actionCell.append(button);
+    } else {
+      actionCell.append(make("span", "Доступ закрыт", "muted-value"));
+    }
+    tr.append(actionCell);
     return tr;
   }));
   if (!rows.length) {
     const tr = document.createElement("tr");
     const td = make("td", "Столы ещё не подключены", "empty");
-    td.colSpan = 7;
+    td.colSpan = 8;
     tr.append(td);
     body.append(tr);
   }
