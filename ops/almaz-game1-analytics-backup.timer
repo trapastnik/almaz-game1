@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily backup of Almaz game analytics database
+
+[Timer]
+OnCalendar=*-*-* 03:15:00
+Persistent=true
+RandomizedDelaySec=20m
+Unit=almaz-game1-analytics-backup.service
+
+[Install]
+WantedBy=timers.target

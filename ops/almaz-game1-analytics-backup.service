@@ -1,0 +1,14 @@
+[Unit]
+Description=Backup Almaz game analytics database
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/srv/projects/almaz-game1/ops/backup-analytics.sh
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+
+[Install]
+WantedBy=multi-user.target
