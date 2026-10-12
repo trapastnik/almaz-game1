@@ -3,7 +3,8 @@ import { readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createDatabase } from "./db.mjs";
-import { cleanText, csvCell, parseDateRange, safeEqual, validateAnalyticsEvent } from "./lib.mjs";
+import { cleanText, csvCell, safeEqual, validateAnalyticsEvent } from "./lib.mjs";
+import { readAnalyticsFilters, readComparisonOptions, researchCsv } from "./research.mjs";
 
 const requiredEnvironment = ["DATABASE_URL", "ANALYTICS_ADMIN_PASSWORD", "ANALYTICS_TOKEN_PEPPER"];
 for (const name of requiredEnvironment) {
@@ -150,6 +151,8 @@ async function serveDashboard(pathname, response) {
     "/analytics": ["index.html", "text/html; charset=utf-8"],
     "/analytics/": ["index.html", "text/html; charset=utf-8"],
     "/analytics/app.js": ["app.js", "text/javascript; charset=utf-8"],
+    "/analytics/research.js": ["research.js", "text/javascript; charset=utf-8"],
+    "/analytics/research-model.js": ["research-model.js", "text/javascript; charset=utf-8"],
     "/analytics/styles.css": ["styles.css", "text/css; charset=utf-8"],
   };
   const entry = files[pathname];
@@ -228,29 +231,25 @@ async function handle(request, response) {
 
   if (url.pathname === "/api/analytics/admin/summary" && request.method === "GET") {
     if (!requireAdmin(request, response)) return;
-    const range = parseDateRange(url.searchParams);
-    const summary = await database.getSummary({
-      ...range,
-      region: cleanText(url.searchParams.get("region"), 120),
-      city: cleanText(url.searchParams.get("city"), 120),
-      venue: cleanText(url.searchParams.get("venue"), 160),
-      device: cleanText(url.searchParams.get("device"), 40),
-      level: /^[1-9]\d*$/.test(url.searchParams.get("level") ?? "") ? url.searchParams.get("level") : "",
-    });
+    const summary = await database.getSummary(readAnalyticsFilters(url.searchParams));
     return sendJson(response, 200, summary);
+  }
+
+  if (["/api/analytics/admin/research", "/api/analytics/admin/research/export.csv"].includes(url.pathname) && request.method === "GET") {
+    if (!requireAdmin(request, response)) return;
+    const filters = readAnalyticsFilters(url.searchParams);
+    const options = readComparisonOptions(url.searchParams);
+    const data = await database.getResearch(filters);
+    if (url.pathname.endsWith(".csv")) {
+      const kind = url.searchParams.get("kind") === "products" ? "products" : "regions";
+      return sendText(response, 200, researchCsv(data, options, kind), "text/csv; charset=utf-8", { "Content-Disposition": `attachment; filename="regional-${kind}.csv"` });
+    }
+    return sendJson(response, 200, data);
   }
 
   if (url.pathname === "/api/analytics/admin/export.csv" && request.method === "GET") {
     if (!requireAdmin(request, response)) return;
-    const range = parseDateRange(url.searchParams);
-    const rows = await database.getCsvRows({
-      ...range,
-      region: cleanText(url.searchParams.get("region"), 120),
-      city: cleanText(url.searchParams.get("city"), 120),
-      venue: cleanText(url.searchParams.get("venue"), 160),
-      device: cleanText(url.searchParams.get("device"), 40),
-      level: /^[1-9]\d*$/.test(url.searchParams.get("level") ?? "") ? url.searchParams.get("level") : "",
-    });
+    const rows = await database.getCsvRows(readAnalyticsFilters(url.searchParams));
     const headers = ["Дата", "Регион", "Город", "Площадка", "Стол", "Игра", "Версия", "Уровень", "Очки", "Верно", "Всего", "Точность", "Время, мс"];
     const lines = rows.map((row) => [row.finished_at?.toISOString?.() ?? row.finished_at, row.region, row.city, row.venue, row.table_label, row.game_id, row.game_version, row.level, row.score, row.correct_count, row.total_count, row.accuracy, row.duration_ms].map(csvCell).join(";"));
     return sendText(response, 200, `\uFEFF${headers.join(";")}\n${lines.join("\n")}`, "text/csv; charset=utf-8", { "Content-Disposition": 'attachment; filename="analytics.csv"' });

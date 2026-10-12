@@ -113,12 +113,16 @@ export function validateAnalyticsEvent(input) {
 
 export function parseDateRange(searchParams) {
   const now = new Date();
-  const defaultFrom = new Date(now.getTime() - 29 * 86_400_000);
-  defaultFrom.setHours(0, 0, 0, 0);
-  const requestedFrom = new Date(searchParams.get("from") ?? "");
-  const requestedTo = new Date(searchParams.get("to") ?? "");
-  const from = Number.isNaN(requestedFrom.getTime()) ? defaultFrom : requestedFrom;
-  const to = Number.isNaN(requestedTo.getTime()) ? now : requestedTo;
-  if (searchParams.get("to") && !Number.isNaN(requestedTo.getTime())) to.setHours(23, 59, 59, 999);
+  const moscowDay = (date) => new Date(date.getTime() + 3 * 3_600_000).toISOString().slice(0, 10);
+  const parseDay = (value, end = false) => {
+    const date = new Date(`${value}T${end ? "23:59:59.999" : "00:00:00.000"}+03:00`);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(value) || Number.isNaN(date.getTime()) || moscowDay(date) !== value) {
+      throw Object.assign(new Error("Некорректная дата"), { status: 400 });
+    }
+    return date;
+  };
+  const from = parseDay(searchParams.get("from") || moscowDay(new Date(now.getTime() - 29 * 86_400_000)));
+  const to = searchParams.get("to") ? parseDay(searchParams.get("to"), true) : now;
+  if (from > to) throw Object.assign(new Error("Начало периода позже окончания"), { status: 400 });
   return { from: from.toISOString(), to: to.toISOString() };
 }

@@ -1,3 +1,5 @@
+import { loadResearch } from "./research.js";
+
 const elements = {
   status: document.querySelector("#load-status"),
   from: document.querySelector("#from-date"),
@@ -6,15 +8,19 @@ const elements = {
   city: document.querySelector("#city-filter"),
   venue: document.querySelector("#venue-filter"),
   level: document.querySelector("#level-filter"),
+  game: document.querySelector("#game-filter"),
+  version: document.querySelector("#version-filter"),
+  data: document.querySelector("#data-filter"),
   export: document.querySelector("#export-link"),
   dialog: document.querySelector("#activation-dialog"),
 };
 
 let locations = [];
+let versions = [];
+let summaryRequest;
 
 function localDateInput(date) {
-  const offset = date.getTimezoneOffset() * 60_000;
-  return new Date(date.getTime() - offset).toISOString().slice(0, 10);
+  return new Date(date.getTime() + 3 * 3_600_000).toISOString().slice(0, 10);
 }
 
 function formatNumber(value) {
@@ -40,7 +46,7 @@ function make(tag, text, className) {
 
 function queryParameters() {
   const parameters = new URLSearchParams();
-  for (const [name, control] of [["from", elements.from], ["to", elements.to], ["region", elements.region], ["city", elements.city], ["venue", elements.venue], ["level", elements.level]]) {
+  for (const [name, control] of [["from", elements.from], ["to", elements.to], ["region", elements.region], ["city", elements.city], ["venue", elements.venue], ["level", elements.level], ["game", elements.game], ["version", elements.version], ["data", elements.data]]) {
     if (control.value) parameters.set(name, control.value);
   }
   return parameters;
@@ -174,12 +180,16 @@ function renderDevices(rows) {
 }
 
 async function loadSummary() {
+  summaryRequest?.abort();
+  summaryRequest = new AbortController();
+  const signal = summaryRequest.signal;
   elements.status.textContent = "Обновление...";
   const parameters = queryParameters();
+  void loadResearch(parameters);
   elements.export.href = `/api/analytics/admin/export.csv?${parameters}`;
   try {
-    const response = await fetch(`/api/analytics/admin/summary?${parameters}`, { cache: "no-store" });
-    if (!response.ok) throw new Error("Не удалось загрузить аналитику");
+    const response = await fetch(`/api/analytics/admin/summary?${parameters}`, { cache: "no-store", signal });
+    if (!response.ok) throw new Error((await response.json()).error || "Не удалось загрузить аналитику");
     const data = await response.json();
     document.querySelector("#metric-sessions").textContent = formatNumber(data.overview.sessions);
     document.querySelector("#metric-accuracy").textContent = `${data.overview.accuracy}%`;
@@ -192,12 +202,28 @@ async function loadSummary() {
     renderHardest(data.hardest);
     renderDevices(data.devices);
     locations = data.locations;
+    versions = data.versions;
+    const games = [...new Set([elements.game.value, ...versions.map((row) => row.game_id)])];
+    const currentGame = elements.game.value;
+    elements.game.replaceChildren(...games.map((game) => new Option(game === "healthy-food" ? "Полезно или вредно" : game, game)));
+    elements.game.value = currentGame;
+    refreshVersionFilter();
     fillSelect(elements.region, [...new Set(locations.map((item) => item.region))].sort(), "Все регионы");
     refreshLocationFilters();
     elements.status.textContent = `Обновлено ${new Date().toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })}`;
   } catch (error) {
+    if (error.name === "AbortError") return;
     elements.status.textContent = error.message;
   }
+}
+
+function refreshVersionFilter(changedGame = false) {
+  const current = elements.version.value;
+  const available = [...new Set(versions.filter((row) => row.game_id === elements.game.value).map((row) => row.game_version))].sort();
+  if (!changedGame && current && !available.includes(current)) available.unshift(current);
+  if (!available.length) available.push(current || "1.0.0");
+  elements.version.replaceChildren(...available.map((version) => new Option(version, version)));
+  if (available.includes(current)) elements.version.value = current;
 }
 
 const today = new Date();
@@ -208,6 +234,7 @@ elements.to.value = localDateInput(today);
 document.querySelector("#apply-filters").addEventListener("click", loadSummary);
 elements.region.addEventListener("change", () => refreshLocationFilters("region"));
 elements.city.addEventListener("change", () => refreshLocationFilters("city"));
+elements.game.addEventListener("change", () => refreshVersionFilter(true));
 document.querySelector("#show-activation").addEventListener("click", () => elements.dialog.showModal());
 document.querySelector("#close-activation").addEventListener("click", () => elements.dialog.close());
 

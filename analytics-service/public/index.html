@@ -3,33 +3,78 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Сводная аналитика игр</title>
+    <title>Региональная аналитика игр</title>
     <link rel="stylesheet" href="/analytics/styles.css">
-    <script src="/analytics/app.js" defer></script>
+    <script src="/analytics/app.js" type="module"></script>
   </head>
   <body>
     <header class="topbar">
       <div>
         <p class="eyebrow">Интерактивные столы</p>
-        <h1>Сводная аналитика</h1>
+        <h1>Региональная аналитика</h1>
       </div>
       <div class="topbar-actions">
         <span class="sync-status" id="load-status">Обновление...</span>
-        <a class="button secondary" id="export-link" href="/api/analytics/admin/export.csv">Скачать CSV</a>
+        <a class="button secondary" id="export-link" href="/api/analytics/admin/export.csv">Прохождения CSV</a>
       </div>
     </header>
 
     <main>
       <section class="filters" aria-label="Фильтры аналитики">
-        <label>С даты<input type="date" id="from-date"></label>
-        <label>По дату<input type="date" id="to-date"></label>
+        <label>С даты, МСК<input type="date" id="from-date"></label>
+        <label>По дату, МСК<input type="date" id="to-date"></label>
         <label>Регион<select id="region-filter"><option value="">Все регионы</option></select></label>
         <label>Город<select id="city-filter"><option value="">Все города</option></select></label>
         <label>Площадка<select id="venue-filter"><option value="">Все площадки</option></select></label>
         <label>Уровень<select id="level-filter"><option value="">Все уровни</option><option value="1">Уровень 1</option><option value="2">Уровень 2</option><option value="3">Уровень 3</option></select></label>
+        <label>Игра<select id="game-filter"><option value="healthy-food">Полезно или вредно</option></select></label>
+        <label>Версия<select id="version-filter"><option value="1.0.0">1.0.0</option></select></label>
+        <label>Источник<select id="data-filter"><option value="real">Реальные прохождения</option><option value="demo">Только ДЕМО</option><option value="all" selected>Все, включая ДЕМО</option></select></label>
         <button class="button primary" id="apply-filters" type="button">Показать</button>
       </section>
 
+      <p class="data-notice" id="research-notice" role="status">Загрузка региональных данных...</p>
+      <nav class="view-tabs" role="tablist" aria-label="Разделы аналитики">
+        <button id="research-tab" role="tab" aria-selected="true" aria-controls="research-panel" type="button">Сравнение регионов</button>
+        <button id="overview-tab" role="tab" aria-selected="false" aria-controls="overview-panel" tabindex="-1" type="button">Прохождения и столы</button>
+      </nav>
+
+      <div id="research-panel" role="tabpanel" aria-labelledby="research-tab">
+        <section class="comparison-settings" aria-label="Выборка для сравнения">
+          <fieldset><legend>Регионы в сравнении</legend><div class="region-options" id="compare-regions"></div></fieldset>
+          <label>Мин. игр на каждом уровне<input id="minimum-sessions" type="number" min="1" max="10000" step="1" value="30"></label>
+          <label>Мин. ответов на продукт<input id="minimum-answers" type="number" min="1" max="10000" step="1" value="20"></label>
+        </section>
+        <div class="research-totals" id="research-totals"></div>
+
+        <section class="research-section" aria-labelledby="comparison-heading">
+          <div class="section-heading"><div><p class="eyebrow">Результаты прохождений</p><h2 id="comparison-heading">Точность по регионам</h2></div><a id="regions-export" class="button secondary" aria-disabled="true">Регионы CSV</a></div>
+          <p class="measure-note" id="coverage-note"></p>
+          <div class="table-scroll" tabindex="0" aria-label="Таблица сравнения регионов"><table class="comparison-table"><thead id="comparison-head"></thead><tbody id="comparison-body"></tbody></table></div>
+        </section>
+
+        <section class="research-section" aria-labelledby="products-heading">
+          <div class="section-heading"><div><p class="eyebrow">Затруднения по содержанию игры</p><h2 id="products-heading">Ошибки по продуктам</h2></div><a id="products-export" class="button secondary" aria-disabled="true">Все продукты CSV</a></div>
+          <div class="matrix-controls">
+            <label>Продукт<input id="product-search" type="search" placeholder="Поиск по названию"></label>
+            <label>Порядок<select id="product-sort"><option value="gap">Разрыв между регионами</option><option value="errors">Частота ошибок</option><option value="name">Название продукта</option></select></label>
+            <p class="measure-note">Доля ошибок, % · ниже: ошибки / ответы. Разрыв показан в процентных пунктах.</p>
+          </div>
+          <div class="table-scroll matrix-scroll" tabindex="0" aria-label="Матрица ошибок по регионам"><table class="matrix-table"><thead id="products-head"></thead><tbody id="products-body"></tbody></table></div>
+          <p class="measure-note" id="products-note"></p>
+        </section>
+
+        <details class="methodology">
+          <summary>Методика и ограничения интерпретации</summary>
+          <p>Единица наблюдения — завершённое прохождение, не уникальный человек. Один посетитель может играть несколько раз. Выборка посетителей столов не является репрезентативной выборкой жителей региона.</p>
+          <p>Точность уровня — среднее доли верных ответов в каждом прохождении. Сопоставимая точность — среднее точностей уровней с одинаковым весом каждого уровня. В расчёт входят только уровни с данными во всех выбранных регионах; отсутствующие значения не заменяются нулями. Разница считается относительно среднего других выбранных регионов, каждый регион имеет одинаковый вес.</p>
+          <p>Порог выборки выделяет малые группы, но не означает достаточную статистическую мощность. Различия описательные: доверительные интервалы, статистическая значимость и причинные выводы не рассчитываются. Возраст, состав аудитории и условия площадок не контролируются; уровни игры не заменяют возрастные группы.</p>
+          <p>Матрица показывает долю ошибок для одного продукта на одном уровне. Разрыв — максимум минус минимум среди регионов, достигших порога ответов. Направления ошибок приведены в подсказке ячейки и CSV. Эталон — категория продукта в конкретной версии игры; результаты не измеряют реальный рацион, заболевания или состояние здоровья.</p>
+          <p>Сравниваются одна игра и одна версия. Даты и границы периода указаны по Москве. Время результатов округлено до часа. ДЕМО — искусственные данные для презентации, они не подходят для исследовательских выводов. Имена игроков и контакты в аналитику не передаются.</p>
+        </details>
+      </div>
+
+      <div id="overview-panel" role="tabpanel" aria-labelledby="overview-tab" hidden>
       <section class="metrics" aria-label="Основные показатели">
         <article><span>Прохождений</span><strong id="metric-sessions">0</strong><small>за выбранный период</small></article>
         <article><span>Точность</span><strong id="metric-accuracy">0%</strong><small id="metric-answers">0 ответов</small></article>
@@ -49,7 +94,7 @@
         </article>
 
         <article class="panel regions-panel">
-          <div class="section-heading"><div><p class="eyebrow">География</p><h2>Сравнение регионов</h2></div></div>
+          <div class="section-heading"><div><p class="eyebrow">География</p><h2>Общая сводка регионов</h2></div></div>
           <div class="table-scroll"><table><thead><tr><th>Регион</th><th>Игр</th><th>Точность</th><th>Средний балл</th></tr></thead><tbody id="regions-body"></tbody></table></div>
         </article>
 
@@ -58,7 +103,6 @@
           <ol class="hardest-list" id="hardest-list"><li class="empty">Ошибок пока нет</li></ol>
         </article>
       </section>
-
       <section class="devices-section">
         <div class="section-heading">
           <div><p class="eyebrow">Оборудование</p><h2>Состояние столов</h2></div>
@@ -66,6 +110,7 @@
         </div>
         <div class="table-scroll devices-table"><table><thead><tr><th>Регион</th><th>Город</th><th>Площадка</th><th>Стол</th><th>Последняя связь</th><th>Игр</th><th>Состояние</th><th>Доступ</th></tr></thead><tbody id="devices-body"></tbody></table></div>
       </section>
+      </div>
     </main>
 
     <dialog id="activation-dialog">

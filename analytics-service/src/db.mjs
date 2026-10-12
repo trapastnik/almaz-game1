@@ -1,6 +1,7 @@
 import { randomInt, randomUUID, randomBytes } from "node:crypto";
 import pg from "pg";
 import { cleanText, hashSecret } from "./lib.mjs";
+import { DEMO_DEVICE_IDS } from "./research.mjs";
 
 const { Pool } = pg;
 
@@ -189,7 +190,7 @@ export function createDatabase({ connectionString, tokenPepper }) {
   function buildFilters(query) {
     const values = [query.from, query.to];
     const clauses = ["e.finished_at >= $1", "e.finished_at <= $2"];
-    for (const [key, column] of [["region", "d.region"], ["city", "d.city"], ["venue", "d.venue"], ["device", "d.id::text"]]) {
+    for (const [key, column] of [["region", "d.region"], ["city", "d.city"], ["venue", "d.venue"], ["device", "d.id::text"], ["gameId", "e.game_id"], ["gameVersion", "e.game_version"]]) {
       if (query[key]) {
         values.push(query[key]);
         clauses.push(`${column} = $${values.length}`);
@@ -199,12 +200,18 @@ export function createDatabase({ connectionString, tokenPepper }) {
       values.push(Number(query.level));
       clauses.push(`e.level = $${values.length}`);
     }
+    if (query.dataSource !== "all") {
+      values.push(DEMO_DEVICE_IDS);
+      clauses.push(`${query.dataSource === "demo" ? "" : "NOT "}(d.id = ANY($${values.length}::uuid[]))`);
+    }
     return { sql: clauses.join(" AND "), values };
   }
 
   async function getSummary(query) {
     const filters = buildFilters(query);
-    const [overview, byRegion, byDay, byLevel, hardest, devices, locations] = await Promise.all([
+    const deviceSource = query.dataSource === "all" ? "TRUE" : `${query.dataSource === "demo" ? "" : "NOT "}(d.id = ANY($1::uuid[]))`;
+    const deviceValues = query.dataSource === "all" ? [] : [DEMO_DEVICE_IDS];
+    const [overview, byRegion, byDay, byLevel, hardest, devices, locations, versions] = await Promise.all([
       pool.query(
         `SELECT COUNT(*)::int AS sessions,
                 COALESCE(SUM(e.total_count), 0)::int AS answers,
@@ -255,11 +262,14 @@ export function createDatabase({ connectionString, tokenPepper }) {
                 d.activated_at, d.last_seen_at, d.disabled_at,
                 COUNT(e.event_id)::int AS sessions
          FROM devices d LEFT JOIN game_events e ON e.device_id = d.id
+         WHERE ${deviceSource}
          GROUP BY d.id ORDER BY d.region, d.city, d.venue, d.table_label`,
+        deviceValues,
       ),
       pool.query(
         `SELECT DISTINCT region, city, venue FROM devices WHERE disabled_at IS NULL ORDER BY region, city, venue`,
       ),
+      pool.query("SELECT DISTINCT game_id, game_version FROM game_events ORDER BY game_id, game_version"),
     ]);
 
     const activeDevices = devices.rows.filter((device) => device.last_seen_at && Date.now() - new Date(device.last_seen_at).getTime() < 86_400_000).length;
@@ -271,8 +281,61 @@ export function createDatabase({ connectionString, tokenPepper }) {
       hardest: hardest.rows,
       devices: devices.rows,
       locations: locations.rows,
+      versions: versions.rows,
       range: { from: query.from, to: query.to },
     };
+  }
+
+  async function getResearch(query) {
+    const filters = buildFilters(query);
+    const client = await pool.connect();
+    try {
+      // A single snapshot keeps the regional denominators and product counts aligned.
+      await client.query("BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY");
+      const [cohorts, products] = await Promise.all([
+        client.query(
+        `WITH sessions AS (
+           SELECT e.event_id, d.region, e.level, e.device_id,
+                  COUNT(*) AS answer_count,
+                  COUNT(*) FILTER (WHERE answer->>'selected' = answer->>'expected') AS correct_count
+           FROM game_events e JOIN devices d ON d.id = e.device_id
+           CROSS JOIN LATERAL jsonb_array_elements(e.answers) answer
+           WHERE ${filters.sql}
+           GROUP BY e.event_id, d.region, e.level, e.device_id
+         )
+         SELECT region, level, COUNT(*)::int AS sessions, SUM(answer_count)::int AS answers,
+                AVG(100.0 * correct_count / answer_count)::float8 AS mean_accuracy,
+                COUNT(*) FILTER (WHERE device_id = ANY($${filters.values.length + 1}::uuid[]))::int AS demo_sessions,
+                COUNT(DISTINCT device_id)::int AS tables
+         FROM sessions GROUP BY region, level ORDER BY region, level`,
+          [...filters.values, DEMO_DEVICE_IDS],
+        ),
+        client.query(
+        `SELECT d.region, e.level, answer->>'foodId' AS food_id, MAX(answer->>'foodName') AS food_name,
+                COUNT(*)::int AS answers,
+                COUNT(*) FILTER (WHERE answer->>'selected' <> answer->>'expected')::int AS mistakes,
+                COUNT(*) FILTER (WHERE answer->>'expected' = 'good' AND answer->>'selected' = 'harmful')::int AS good_as_harmful,
+                COUNT(*) FILTER (WHERE answer->>'expected' = 'harmful' AND answer->>'selected' = 'good')::int AS harmful_as_good
+         FROM game_events e JOIN devices d ON d.id = e.device_id
+         CROSS JOIN LATERAL jsonb_array_elements(e.answers) answer
+         WHERE ${filters.sql}
+         GROUP BY d.region, e.level, answer->>'foodId' ORDER BY e.level, food_name, d.region`,
+          filters.values,
+        ),
+      ]);
+      await client.query("COMMIT");
+      return {
+        cohorts: cohorts.rows, products: products.rows,
+        range: { from: query.from, to: query.to },
+        gameId: query.gameId, gameVersion: query.gameVersion, dataSource: query.dataSource,
+        city: query.city, venue: query.venue,
+      };
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   async function getCsvRows(query) {
@@ -304,6 +367,7 @@ export function createDatabase({ connectionString, tokenPepper }) {
     disableDevice,
     saveEvents,
     getSummary,
+    getResearch,
     getCsvRows,
     deleteExpiredEvents,
     close: () => pool.end(),

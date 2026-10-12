@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { csvCell, hashSecret, safeEqual, validateAnalyticsEvent } from "../src/lib.mjs";
+import { csvCell, hashSecret, parseDateRange, safeEqual, validateAnalyticsEvent } from "../src/lib.mjs";
 
 const validEvent = {
   eventId: "event_1234567890",
@@ -49,4 +49,16 @@ test("neutralizes spreadsheet formulas in CSV cells", () => {
   assert.equal(csvCell("=2+2"), "'=2+2");
   assert.equal(csvCell("Обычное значение"), "Обычное значение");
   assert.equal(csvCell("Площадка; 1"), '"Площадка; 1"');
+});
+
+test("date filters use Moscow day boundaries independent of server timezone", () => {
+  const range = parseDateRange(new URLSearchParams({ from: "2026-10-01", to: "2026-10-12" }));
+  assert.equal(range.from, "2026-09-30T21:00:00.000Z");
+  assert.equal(range.to, "2026-10-12T20:59:59.999Z");
+});
+
+test("invalid and reversed dates are rejected instead of silently changing the sample", () => {
+  for (const values of [{ from: "2026-02-30" }, { to: "invalid" }, { from: "2026-10-12", to: "2026-10-01" }]) {
+    assert.throws(() => parseDateRange(new URLSearchParams(values)), { status: 400 });
+  }
 });
