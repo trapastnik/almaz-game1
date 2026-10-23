@@ -1830,6 +1830,105 @@ h2 {
   min-width: 280px;
 }
 
+@media (min-width: 1440px) and (min-height: 721px) {
+  .game-shell {
+    --facts-width: clamp(420px, 28vw, 640px);
+    --game-body-width: 2240px;
+    --game-body-gap: 28px;
+  }
+
+  .game-body {
+    grid-template-columns: minmax(0, 1fr) var(--facts-width);
+    max-width: var(--game-body-width);
+    gap: var(--game-body-gap);
+  }
+
+  .game-stage {
+    gap: 24px;
+  }
+
+  .facts-rail {
+    padding: 20px;
+  }
+
+  .facts-heading {
+    font-size: 26px;
+  }
+
+  .facts-list {
+    gap: 12px;
+  }
+
+  .facts-list li {
+    grid-template-columns: 56px minmax(0, 1fr);
+    gap: 14px;
+    min-height: 104px;
+    padding: 14px;
+  }
+
+  .fact-image {
+    width: 56px;
+    height: 56px;
+  }
+
+  .facts-list strong {
+    font-size: 22px;
+    line-height: 1.2;
+  }
+
+  .facts-list small {
+    font-size: 20px;
+    line-height: 1.35;
+  }
+
+  .facts-scrollbar {
+    top: 86px;
+    width: 12px;
+  }
+
+  .streak {
+    right: calc(max(28px, (100vw - var(--game-body-width)) / 2) + var(--facts-width) + var(--game-body-gap));
+  }
+}
+
+@media (min-width: 2560px) and (min-height: 721px) {
+  .game-shell {
+    --facts-width: 720px;
+  }
+
+  .facts-heading {
+    min-height: 58px;
+    font-size: 30px;
+  }
+
+  .facts-heading > span {
+    font-size: 18px;
+  }
+
+  .facts-list li {
+    grid-template-columns: 64px minmax(0, 1fr);
+    min-height: 120px;
+    padding: 16px;
+  }
+
+  .fact-image {
+    width: 64px;
+    height: 64px;
+  }
+
+  .facts-list strong {
+    font-size: 30px;
+  }
+
+  .facts-list small {
+    font-size: 26px;
+  }
+
+  .facts-scrollbar {
+    top: 96px;
+  }
+}
+
 @media (max-width: 1080px), (max-height: 720px) {
   .screen,
   .game-shell {
